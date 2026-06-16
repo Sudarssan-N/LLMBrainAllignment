@@ -1,0 +1,83 @@
+# Default configuration for the LLM–Brain Alignment pipeline.
+# Override on the CLI (e.g. --model pythia-410m) or by passing a different --config file.
+
+seed: 0
+
+paths:
+  data_raw: data/raw            # downloaded brain data
+  data_derived: data/derived    # pipeline outputs (activations, surprisal, results)
+  hf_cache: hf_cache            # HuggingFace model/tokenizer cache
+
+device: auto                    # auto | cpu | cuda | mps
+
+# ---------------------------------------------------------------------------
+# Models. `key` is the short name used in output paths and the tracker.
+# layers: null => use every transformer block; or a list of indices.
+# ---------------------------------------------------------------------------
+models:
+  gpt2:
+    hf_id: gpt2
+    family: gpt2
+    type: base
+    layers: null
+  gpt2-medium:
+    hf_id: gpt2-medium
+    family: gpt2
+    type: base
+    layers: null
+  pythia-160m:
+    hf_id: EleutherAI/pythia-160m
+    family: pythia
+    type: base
+    layers: null
+  pythia-410m:
+    hf_id: EleutherAI/pythia-410m
+    family: pythia
+    type: base
+    layers: null
+  opt-125m:
+    hf_id: facebook/opt-125m
+    family: opt
+    type: base
+    layers: null
+
+default_model: gpt2
+
+# ---------------------------------------------------------------------------
+# Activation pooling: how subword tokens are aggregated to a per-sentence vector.
+# ---------------------------------------------------------------------------
+pooling:
+  unit: sentence                # sentence | word  (Pereira responses are per-sentence)
+  method: mean                  # mean | last | sum
+  include_bos: false
+
+# ---------------------------------------------------------------------------
+# Surprisal feature construction (predictor controlled for in variance partitioning).
+# ---------------------------------------------------------------------------
+surprisal:
+  reducer: [mean, sum, last]    # per-sentence summaries to use as surprisal features
+  base: 2                       # log base for surprisal (bits if 2)
+
+# ---------------------------------------------------------------------------
+# Encoding model (ridge regression voxel-wise).
+# ---------------------------------------------------------------------------
+encoding:
+  alphas: [1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0]
+  n_folds: 5
+  pca_components: null          # optionally reduce activation dim before ridge (null = off)
+  standardize: true
+  metric: pearson               # pearson r per voxel
+
+noise_ceiling:
+  method: split_half            # split_half | none
+  n_splits: 10
+
+rsa:
+  rdm_metric: correlation       # correlation | euclidean
+  compare: spearman             # spearman | pearson | kendall
+
+# Dataset selection
+dataset:
+  name: pereira2018
+  experiments: [243, 384]       # Pereira exp 2 (384) and exp 3 (243) sentence sets
+  atlas: language               # language network voxels
