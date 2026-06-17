@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import argparse
 
+import numpy as np
 import _bootstrap  # noqa: F401
 
 from llmbrain.config import load_config
 from llmbrain.data.pereira import load_pereira2018
 from llmbrain.encoding.variance_partitioning import variance_partitioning
-from llmbrain.utils.io import load_arrays, load_json, save_json
+from llmbrain.utils.io import load_arrays, load_json, save_arrays, save_json
 
 
 def main():
@@ -57,6 +58,7 @@ def main():
     enc = cfg.raw["encoding"]
 
     results = {}
+    vps = {}
     for l in layers:
         vp = variance_partitioning(
             hidden=acts[f"layer_{l}"],
@@ -68,15 +70,29 @@ def main():
             pca_components=enc.get("pca_components"),
             seed=cfg.seed,
         )
-        s = vp.summary()
-        results[l] = s
+        results[l] = vp.summary()
+        vps[l] = vp
+        s = results[l]
         print(f"[stage4] layer {l:2d}  unique_hidden={s['mean_unique_hidden']:.4f}  "
               f"unique_surprisal={s['mean_unique_surprisal']:.4f}  "
               f"shared={s['mean_shared']:.4f}")
 
+    # Peak layer (by clipped mean unique-hidden) gets bootstrap CIs + per-voxel arrays
+    # saved, so base-vs-instruct can be compared with a paired test downstream.
+    peak = max(results, key=lambda l: results[l]["mean_unique_hidden"])
+    results[peak] = vps[peak].summary(ci=True, seed=cfg.seed)
+    ci = results[peak]["ci_unique_hidden"]
+    print(f"[stage4] peak layer={peak} unique_hidden={ci['mean']:.4f} "
+          f"[{ci['lo']:.4f}, {ci['hi']:.4f}] (95% CI, bootstrap over voxels)")
+    save_arrays(out_dir / "varpart_peak_voxels.npz",
+                unique_hidden=vps[peak].unique_hidden,
+                unique_surprisal=vps[peak].unique_surprisal,
+                layer=np.array([peak]))
+
     save_json(out_dir / "varpart.json", {
         "model_key": spec.key,
         "is_synthetic": ds.is_synthetic,
+        "peak_layer": peak,
         "per_layer": results,
     })
     print(f"[stage4] wrote {out_dir/'varpart.json'}")

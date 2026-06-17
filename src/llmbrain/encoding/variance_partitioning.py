@@ -34,12 +34,15 @@ class VariancePartition:
     unique_surprisal: np.ndarray
     shared: np.ndarray
 
-    def summary(self, clip: bool = True) -> dict:
+    def summary(self, clip: bool = True, ci: bool = False, n_boot: int = 1000,
+               seed: int = 0) -> dict:
+        clip_range = (0.0, None) if clip else None
+
         def agg(a):
             a = np.clip(a, 0, None) if clip else a
             return float(np.nanmean(a))
 
-        return {
+        out = {
             "mean_r2_hidden": agg(self.r2_hidden),
             "mean_r2_surprisal": agg(self.r2_surprisal),
             "mean_r2_joint": agg(self.r2_joint),
@@ -48,6 +51,15 @@ class VariancePartition:
             "mean_shared": agg(self.shared),
             "n_voxels": int(self.r2_hidden.shape[0]),
         }
+        if ci:
+            from .stats import bootstrap_ci_mean
+
+            cr = (0.0, np.inf) if clip else None
+            out["ci_unique_hidden"] = bootstrap_ci_mean(
+                self.unique_hidden, n_boot=n_boot, seed=seed, clip=cr)
+            out["ci_unique_surprisal"] = bootstrap_ci_mean(
+                self.unique_surprisal, n_boot=n_boot, seed=seed, clip=cr)
+        return out
 
 
 def variance_partitioning(

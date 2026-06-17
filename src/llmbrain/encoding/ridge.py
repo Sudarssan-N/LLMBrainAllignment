@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from sklearn.decomposition import PCA
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import RidgeCV
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
@@ -46,18 +46,6 @@ def _r2_per_column(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
     ss_tot = ((y_true - y_true.mean(axis=0, keepdims=True)) ** 2).sum(axis=0)
     ss_tot[ss_tot == 0] = np.nan
     return 1.0 - ss_res / ss_tot
-
-
-def _fit_alpha(X_tr, Y_tr, X_va, Y_va, alphas):
-    """Pick a single shared alpha by validation R² (averaged over voxels)."""
-    best_alpha, best_score = alphas[0], -np.inf
-    for a in alphas:
-        model = Ridge(alpha=a)
-        model.fit(X_tr, Y_tr)
-        score = np.nanmean(_r2_per_column(Y_va, model.predict(X_va)))
-        if score > best_score:
-            best_score, best_alpha = score, a
-    return best_alpha
 
 
 def ridge_encode(
@@ -94,11 +82,11 @@ def ridge_encode(
             pca = PCA(n_components=k, random_state=seed).fit(X_tr)
             X_tr, X_te = pca.transform(X_tr), pca.transform(X_te)
 
-        # inner split of the training fold to choose alpha
-        cut = max(1, int(0.8 * X_tr.shape[0]))
-        alpha = _fit_alpha(X_tr[:cut], Y_tr[:cut], X_tr[cut:], Y_tr[cut:], alphas)
-
-        model = Ridge(alpha=alpha)
+        # Alpha chosen by efficient leave-one-out generalized CV on the training fold
+        # (deterministic). Replaces the noisy single 80/20 split, which made the joint and
+        # hidden-only models occasionally pick different alphas and manufacture spurious
+        # "unique surprisal" on isolated layers.
+        model = RidgeCV(alphas=alphas, alpha_per_target=False)
         model.fit(X_tr, Y_tr)
         pred = model.predict(X_te)
         r_folds.append(pearson_per_column(Y_te, pred))

@@ -56,15 +56,23 @@ def main():
             row["n_layers"] = len(e.get("per_layer", {}))
         vp = d / "varpart.json"
         if vp.exists():
-            v = load_json(vp)["per_layer"]
-            l_uh, uh = _peak(v, "mean_unique_hidden")
+            vj = load_json(vp)
+            v = vj["per_layer"]
+            # Prefer the Stage-4-designated peak layer (carries bootstrap CI); fall back to
+            # a max search for older runs.
+            l_uh = vj.get("peak_layer")
+            l_uh = int(l_uh) if l_uh is not None else _peak(v, "mean_unique_hidden")[0]
+            peak = v[str(l_uh)] if l_uh is not None else {}
+            uh = peak.get("mean_unique_hidden")
+            us = peak.get("mean_unique_surprisal")
             row["peak_unique_hidden"] = uh
             row["peak_unique_hidden_layer"] = l_uh
-            row["unique_surprisal_at_peak"] = (
-                v[str(l_uh)]["mean_unique_surprisal"] if l_uh is not None else None
-            )
-            if uh and row["unique_surprisal_at_peak"]:
-                row["hidden_over_surprisal"] = round(uh / row["unique_surprisal_at_peak"], 1)
+            row["unique_surprisal_at_peak"] = us
+            if peak.get("ci_unique_hidden"):
+                c = peak["ci_unique_hidden"]
+                row["unique_hidden_ci"] = f"[{c['lo']:.4f},{c['hi']:.4f}]"
+            if uh and us:
+                row["hidden_over_surprisal"] = round(uh / us, 1)
         rsa = d / "rsa.json"
         if rsa.exists():
             r = load_json(rsa)
