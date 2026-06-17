@@ -96,4 +96,7 @@ dataset:
   # NaN voxel blocks. Run ONE experiment at a time for a dense matrix; loop over both
   # (384 then 243) for the full result. 384sentences (exp2) is the larger default.
   experiments: [384]
-  atlas: language               # language network voxels
+  # The Pereira2018.language assembly is already restricted to language-network fROIs
+  # (roi level holds LH_IFG, LH_AntTemp, LH_AngG, ...), so no atlas filter is needed.
+  # Set to a substring (e.g. 'IFG') to restrict to specific fROIs.
+  atlas: null

@@ -192,6 +192,8 @@ def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
     NaN voxels (Pereira voxels are subject/experiment-specific, so pooling leaves NaN
     blocks). Prints the discovered schema for diagnosability.
     """
+    import os
+
     import numpy as np
 
     a = assembly
@@ -199,9 +201,10 @@ def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
     neur_dim = a.dims[1]
     pres_levels = _dim_level_names(a, pres_dim)
     neur_levels = _dim_level_names(a, neur_dim)
-    print(f"[pereira] dims={a.dims} shape={a.shape}")
-    print(f"[pereira] presentation levels={pres_levels}")
-    print(f"[pereira] neuroid levels={neur_levels}")
+    if os.environ.get("LLMBRAIN_VERBOSE"):  # set to see full schema (debugging)
+        print(f"[pereira] dims={a.dims} shape={a.shape}")
+        print(f"[pereira] presentation levels={pres_levels}")
+        print(f"[pereira] neuroid levels={neur_levels}")
 
     # --- atlas filter (neuroid dim) ---
     if atlas:

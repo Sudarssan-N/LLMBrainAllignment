@@ -22,7 +22,7 @@ from llmbrain.config import load_config
 from llmbrain.data.pereira import load_pereira2018
 from llmbrain.encoding.ridge import ridge_encode, split_half_noise_ceiling
 from llmbrain.encoding.noise import cross_subject_noise_ceiling, normalized_predictivity
-from llmbrain.utils.io import load_arrays, save_json
+from llmbrain.utils.io import load_arrays, save_arrays, save_json
 
 
 def main():
@@ -53,15 +53,25 @@ def main():
     # Synthetic: shared voxels with repeats -> split-half reliability.
     nc = None
     if ds.voxel_subject is not None and np.unique(ds.voxel_subject).size >= 2:
-        print(f"[stage3] computing cross-subject noise ceiling over "
-              f"{np.unique(ds.voxel_subject).size} subjects ...")
-        nc = cross_subject_noise_ceiling(
-            Y, ds.voxel_subject, alphas=enc["alphas"],
-            pca_components=cfg.raw["noise_ceiling"].get("pca_components", 100),
-            n_folds=enc["n_folds"], standardize=enc["standardize"], seed=cfg.seed,
-        )
-        print(f"[stage3] ceiling: mean={np.nanmean(nc):.3f} "
-              f"valid_voxels={int(np.isfinite(nc).sum())}")
+        # The ceiling depends only on the brain data (not the model), so cache it across
+        # the model sweep. Key on dataset config so a config change invalidates it.
+        exp = cfg.raw["dataset"].get("experiments")
+        cache = cfg.derived_dir() / f"noise_ceiling_exp{exp}_v{Y.shape[1]}.npz"
+        if cache.exists():
+            nc = load_arrays(cache)["ceiling"]
+            print(f"[stage3] loaded cached noise ceiling {cache.name} "
+                  f"(mean={np.nanmean(nc):.3f})")
+        else:
+            print(f"[stage3] computing cross-subject noise ceiling over "
+                  f"{np.unique(ds.voxel_subject).size} subjects ...")
+            nc = cross_subject_noise_ceiling(
+                Y, ds.voxel_subject, alphas=enc["alphas"],
+                pca_components=cfg.raw["noise_ceiling"].get("pca_components", 100),
+                n_folds=enc["n_folds"], standardize=enc["standardize"], seed=cfg.seed,
+            )
+            save_arrays(cache, ceiling=nc)
+            print(f"[stage3] ceiling: mean={np.nanmean(nc):.3f} "
+                  f"valid_voxels={int(np.isfinite(nc).sum())} (cached -> {cache.name})")
     elif ds.responses_by_subject:
         try:
             nc = split_half_noise_ceiling(
