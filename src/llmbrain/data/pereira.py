@@ -84,39 +84,79 @@ def _load_via_brainscore(experiments, atlas) -> BrainDataset:
     return _assembly_to_dataset(assembly, experiments, atlas)
 
 
+def _coord_dim(a, coord):
+    """Return the single dimension a coord is indexed along, or None."""
+    try:
+        dims = a[coord].dims
+        return dims[0] if len(dims) == 1 else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _safe_filter(a, coord, wanted, dim_name):
+    """Filter assembly `a` along `dim_name` by membership of `coord` in `wanted`.
+
+    Tolerant: matches exact values, their string forms, and substrings (so int 384
+    matches the string '384sentences'). If the filter would keep zero rows, it is a
+    no-op and a warning is printed — we never silently return an empty assembly.
+    """
+    import numpy as np
+
+    if coord not in a.coords or not wanted:
+        return a
+    vals = np.asarray(a[coord].values)
+    vals_str = vals.astype(str)
+    wanted_str = [str(w) for w in wanted]
+    keep = np.isin(vals, np.asarray(wanted)) | np.isin(vals_str, wanted_str)
+    for w in wanted_str:  # substring match (384 -> '384sentences')
+        keep |= np.char.find(vals_str, w) >= 0
+    idx = np.flatnonzero(keep)
+    if idx.size == 0:
+        print(f"[pereira] WARNING: filter {coord}∈{wanted} matched 0 of "
+              f"{vals.size} (values e.g. {sorted(set(vals_str))[:4]}); keeping all.")
+        return a
+    return a.isel({dim_name: idx})
+
+
 def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
     """Convert an xarray NeuroidAssembly (presentation × neuroid) to BrainDataset.
 
-    Expected coords (names vary slightly by version):
-      - presentation: 'stimulus'/'sentence', 'experiment'
-      - neuroid: 'subject', 'atlas'/'roi'
+    Tolerant to coord-name/version drift. Prints the discovered schema on load so any
+    remaining mismatch is diagnosable from the run output.
     """
     import numpy as np  # local to keep import errors scoped
 
     a = assembly
-    # Filter by atlas/network if available.
-    neuroid_dim = "neuroid"
-    if atlas and "atlas" in a.coords:
-        a = a.sel(neuroid=a["atlas"].values == atlas) if neuroid_dim in a.dims else a
-    # Filter by experiment if available.
+    print(f"[pereira] assembly dims={a.dims} shape={a.shape}")
+    print(f"[pereira] coords={list(a.coords)}")
+
+    pres_dim = a.dims[0] if a.ndim >= 1 else "presentation"
+    neur_dim = a.dims[1] if a.ndim >= 2 else "neuroid"
+
+    # Filter by atlas/network (neuroid dim) and experiment (presentation dim), defensively.
+    if atlas:
+        atlas_coord = next((c for c in ("atlas", "roi", "region") if c in a.coords), None)
+        if atlas_coord:
+            a = _safe_filter(a, atlas_coord, [atlas], _coord_dim(a, atlas_coord) or neur_dim)
     if experiments and "experiment" in a.coords:
-        keep = np.isin(a["experiment"].values, np.asarray(experiments).astype(str)) | np.isin(
-            a["experiment"].values, np.asarray(experiments)
-        )
-        a = a.isel(presentation=np.flatnonzero(keep))
+        a = _safe_filter(a, "experiment", experiments,
+                         _coord_dim(a, "experiment") or pres_dim)
 
     responses = np.asarray(a.values, dtype=np.float32)  # (presentation, neuroid)
 
     # sentence text
     sent_coord = next(
-        (c for c in ("stimulus", "sentence", "stimulus_sentence", "word") if c in a.coords),
+        (c for c in ("stimulus", "sentence", "stimulus_sentence", "sentence_text",
+                     "stimulus_sentence_text", "word") if c in a.coords),
         None,
     )
     sentences = (
-        [str(s) for s in a[sent_coord].values]
+        [str(s) for s in np.asarray(a[sent_coord].values)]
         if sent_coord
         else [f"stim_{i}" for i in range(responses.shape[0])]
     )
+    print(f"[pereira] using sentence coord={sent_coord!r}; n_sentences={len(sentences)} "
+          f"n_neuroids={responses.shape[1]}")
 
     roi = None
     for c in ("roi", "atlas", "region"):
