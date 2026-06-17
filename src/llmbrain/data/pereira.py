@@ -57,26 +57,33 @@ def _load_via_brainscore(experiments, atlas) -> BrainDataset:
     documented benchmark data packager and fall back to the assembly registry. This is the
     one place to update if the harness API changes.
     """
+    import importlib
+
     assembly = None
     errors = []
+    identifier = "Pereira2018.language"
 
-    # Preferred: data packaging accessor.
+    # Attempt 1: official API. Note this routes through brainscore's entry-point plugin
+    # loader, which is broken on Python 3.12 ('EntryPoints' object has no attribute 'get').
     try:
         from brainscore_language import load_dataset  # type: ignore
 
-        assembly = load_dataset("Pereira2018.language")
+        assembly = load_dataset(identifier)
     except Exception as e:  # noqa: BLE001
         errors.append(f"load_dataset: {e}")
 
+    # Attempt 2: bypass the entry-point loader. Importing the plugin module runs its
+    # registration code, populating data_registry; then we call the registered loader
+    # directly. This sidesteps the py3.12 importlib.metadata incompatibility.
     if assembly is None:
         try:
-            from brainscore_language.data_packaging.pereira2018 import (  # type: ignore
-                upload_pereira2018,
-            )
+            from brainscore_language import data_registry  # type: ignore
 
-            assembly = upload_pereira2018()
+            if identifier not in data_registry:
+                importlib.import_module("brainscore_language.data.pereira2018")
+            assembly = data_registry[identifier]()
         except Exception as e:  # noqa: BLE001
-            errors.append(f"data_packaging: {e}")
+            errors.append(f"data_registry: {e}")
 
     if assembly is None:
         raise ImportError("; ".join(errors) or "brainscore_language not importable")
