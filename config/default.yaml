@@ -79,5 +79,8 @@ rsa:
 # Dataset selection
 dataset:
   name: pereira2018
-  experiments: [243, 384]       # Pereira exp 2 (384) and exp 3 (243) sentence sets
+  # Pereira voxels are subject/experiment-specific, so pooling both experiments leaves
+  # NaN voxel blocks. Run ONE experiment at a time for a dense matrix; loop over both
+  # (384 then 243) for the full result. 384sentences (exp2) is the larger default.
+  experiments: [384]
   atlas: language               # language network voxels

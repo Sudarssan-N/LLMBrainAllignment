@@ -5,6 +5,22 @@ what was decided, what's blocked, what's next. Link runs to `TRACKER.md` IDs.
 
 ---
 
+## 2026-06-17 (cont.) — Real Pereira2018 loaded; MultiIndex + NaN handling
+
+Data now loads: assembly is `(presentation=627, neuroid=13553)`. Two structural fixes:
+1. **MultiIndex levels:** stimulus text, `experiment`, `subject`, `atlas` are *levels* of
+   the presentation/neuroid MultiIndexes, so `list(a.coords)` showed only dim names →
+   sentence coord came back `None` and Stage 1 silently ran GPT-2 on placeholder strings
+   `stim_0..`. Rewrote the adapter to read levels via `a.indexes[dim].get_level_values`,
+   pick the sentence level by whitespace heuristic, and filter experiment/atlas on levels.
+2. **NaN voxels:** Pereira voxels are subject/experiment-specific; pooling both experiments
+   (627 rows) leaves NaN blocks → sklearn `Input y contains NaN`. Adapter now filters to ONE
+   experiment and drops NaN voxels → dense matrix. Config default `experiments: [384]`.
+   Verified end-to-end on a simulated MultiIndex assembly (drops 4/8 NaN voxels correctly).
+
+**ACTION for next Colab run:** re-run Stages 1–2 (cached activations were on placeholder
+sentences and are invalid; also row count changes 627→384 after experiment filter).
+
 ## 2026-06-17 — Colab brain-score data access debugging
 
 **Context:** wiring real Pereira2018 via `brain-score/language` v2.2.1 on Colab (Python 3.12).

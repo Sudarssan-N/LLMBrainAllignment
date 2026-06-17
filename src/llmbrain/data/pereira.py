@@ -115,95 +115,151 @@ def _load_via_brainscore(experiments, atlas) -> BrainDataset:
     return _assembly_to_dataset(assembly, experiments, atlas)
 
 
-def _coord_dim(a, coord):
-    """Return the single dimension a coord is indexed along, or None."""
-    try:
-        dims = a[coord].dims
-        return dims[0] if len(dims) == 1 else None
-    except Exception:  # noqa: BLE001
-        return None
+def _dim_level_names(a, dim) -> list[str]:
+    """All coordinate names addressable on `dim`, including MultiIndex levels.
 
-
-def _safe_filter(a, coord, wanted, dim_name):
-    """Filter assembly `a` along `dim_name` by membership of `coord` in `wanted`.
-
-    Tolerant: matches exact values, their string forms, and substrings (so int 384
-    matches the string '384sentences'). If the filter would keep zero rows, it is a
-    no-op and a warning is printed — we never silently return an empty assembly.
+    brain-score assemblies pack stimulus/experiment/subject/atlas as *levels* of the
+    'presentation' and 'neuroid' MultiIndexes, so they don't show up in `list(a.coords)`.
     """
+    names: list[str] = []
+    idx = a.indexes.get(dim)
+    for n in getattr(idx, "names", []) or []:
+        if n is not None and n != dim:
+            names.append(n)
+    for c in a.coords:  # plain (non-index) coords attached to this dim
+        if c != dim and getattr(a[c], "dims", ()) == (dim,) and c not in names:
+            names.append(c)
+    return names
+
+
+def _level_values(a, dim, name):
+    """Values of a coord/level on `dim`, whether plain coord or MultiIndex level."""
     import numpy as np
 
-    if coord not in a.coords or not wanted:
-        return a
-    vals = np.asarray(a[coord].values)
+    if name in a.coords:
+        return np.asarray(a[name].values)
+    idx = a.indexes.get(dim)
+    if idx is not None and name in (getattr(idx, "names", []) or []):
+        return np.asarray(idx.get_level_values(name))
+    raise KeyError(name)
+
+
+def _pick_sentence_level(a, dim, names) -> str | None:
+    """Choose the level holding sentence text: prefer name match, else most whitespace-y."""
+    import numpy as np
+
+    preferred = ("sentence", "stimulus_sentence", "sentence_text", "stimulus", "word")
+    for p in preferred:
+        if p in names:
+            return p
+    best, best_score = None, -1.0
+    for n in names:
+        try:
+            vals = _level_values(a, dim, n)
+        except Exception:  # noqa: BLE001
+            continue
+        if vals.dtype.kind not in ("U", "S", "O"):
+            continue
+        sv = vals.astype(str)
+        score = float(np.mean([" " in s for s in sv]))  # sentences contain spaces
+        if score > best_score:
+            best, best_score = n, score
+    return best if best_score > 0 else None
+
+
+def _filter_dim(a, dim, name, wanted):
+    """Boolean-filter `a` along `dim` where level `name` ∈ wanted (tolerant; substring)."""
+    import numpy as np
+
+    vals = _level_values(a, dim, name)
     vals_str = vals.astype(str)
     wanted_str = [str(w) for w in wanted]
-    keep = np.isin(vals, np.asarray(wanted)) | np.isin(vals_str, wanted_str)
-    for w in wanted_str:  # substring match (384 -> '384sentences')
+    keep = np.isin(vals, np.asarray(wanted, dtype=object)) | np.isin(vals_str, wanted_str)
+    for w in wanted_str:
         keep |= np.char.find(vals_str, w) >= 0
     idx = np.flatnonzero(keep)
     if idx.size == 0:
-        print(f"[pereira] WARNING: filter {coord}∈{wanted} matched 0 of "
-              f"{vals.size} (values e.g. {sorted(set(vals_str))[:4]}); keeping all.")
+        print(f"[pereira] WARNING: filter {name}∈{wanted} matched 0 of {vals.size} "
+              f"(e.g. {sorted(set(vals_str))[:4]}); keeping all.")
         return a
-    return a.isel({dim_name: idx})
+    return a.isel({dim: idx})
 
 
 def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
     """Convert an xarray NeuroidAssembly (presentation × neuroid) to BrainDataset.
 
-    Tolerant to coord-name/version drift. Prints the discovered schema on load so any
-    remaining mismatch is diagnosable from the run output.
+    Reads MultiIndex levels, filters to the requested experiment(s) and atlas, then drops
+    NaN voxels (Pereira voxels are subject/experiment-specific, so pooling leaves NaN
+    blocks). Prints the discovered schema for diagnosability.
     """
-    import numpy as np  # local to keep import errors scoped
+    import numpy as np
 
     a = assembly
-    print(f"[pereira] assembly dims={a.dims} shape={a.shape}")
-    print(f"[pereira] coords={list(a.coords)}")
+    pres_dim = a.dims[0]
+    neur_dim = a.dims[1]
+    pres_levels = _dim_level_names(a, pres_dim)
+    neur_levels = _dim_level_names(a, neur_dim)
+    print(f"[pereira] dims={a.dims} shape={a.shape}")
+    print(f"[pereira] presentation levels={pres_levels}")
+    print(f"[pereira] neuroid levels={neur_levels}")
 
-    pres_dim = a.dims[0] if a.ndim >= 1 else "presentation"
-    neur_dim = a.dims[1] if a.ndim >= 2 else "neuroid"
-
-    # Filter by atlas/network (neuroid dim) and experiment (presentation dim), defensively.
+    # --- atlas filter (neuroid dim) ---
     if atlas:
-        atlas_coord = next((c for c in ("atlas", "roi", "region") if c in a.coords), None)
-        if atlas_coord:
-            a = _safe_filter(a, atlas_coord, [atlas], _coord_dim(a, atlas_coord) or neur_dim)
-    if experiments and "experiment" in a.coords:
-        a = _safe_filter(a, "experiment", experiments,
-                         _coord_dim(a, "experiment") or pres_dim)
+        atlas_lvl = next((n for n in neur_levels if n in ("atlas", "roi", "region")), None)
+        if atlas_lvl:
+            a = _filter_dim(a, neur_dim, atlas_lvl, [atlas])
+
+    # --- experiment filter (presentation dim) ---
+    exp_lvl = next((n for n in pres_levels if "experiment" in n.lower()), None)
+    if experiments and exp_lvl:
+        a = _filter_dim(a, pres_dim, exp_lvl, experiments)
+    elif experiments and not exp_lvl:
+        print(f"[pereira] WARNING: no experiment level found among {pres_levels}; "
+              "cannot filter — NaN voxels likely if multiple experiments are pooled.")
+
+    # --- sentences ---
+    sent_lvl = _pick_sentence_level(a, pres_dim, pres_levels)
+    if sent_lvl:
+        sentences = [str(s) for s in _level_values(a, pres_dim, sent_lvl)]
+    else:
+        sentences = [f"stim_{i}" for i in range(a.shape[0])]
+        print(f"[pereira] WARNING: no sentence-text level found among {pres_levels}; "
+              "using placeholders (activations would be meaningless!).")
 
     responses = np.asarray(a.values, dtype=np.float32)  # (presentation, neuroid)
 
-    # sentence text
-    sent_coord = next(
-        (c for c in ("stimulus", "sentence", "stimulus_sentence", "sentence_text",
-                     "stimulus_sentence_text", "word") if c in a.coords),
-        None,
-    )
-    sentences = (
-        [str(s) for s in np.asarray(a[sent_coord].values)]
-        if sent_coord
-        else [f"stim_{i}" for i in range(responses.shape[0])]
-    )
-    print(f"[pereira] using sentence coord={sent_coord!r}; n_sentences={len(sentences)} "
-          f"n_neuroids={responses.shape[1]}")
+    # --- drop NaN voxels (columns), then any residual NaN rows ---
+    col_ok = ~np.isnan(responses).any(axis=0)
+    n_drop = int((~col_ok).sum())
+    if n_drop:
+        print(f"[pereira] dropping {n_drop}/{responses.shape[1]} voxels with NaN "
+              f"(subject/experiment-specific coverage)")
+    responses = responses[:, col_ok]
+    row_ok = ~np.isnan(responses).any(axis=1)
+    if (~row_ok).any():
+        print(f"[pereira] dropping {int((~row_ok).sum())} presentation rows with residual NaN")
+        responses = responses[row_ok]
+        sentences = [s for s, keep in zip(sentences, row_ok) if keep]
 
-    roi = None
-    for c in ("roi", "atlas", "region"):
-        if c in a.coords:
-            roi = np.asarray(a[c].values)
-            break
+    if responses.shape[1] == 0:
+        raise ValueError(
+            "All voxels were dropped as NaN. This usually means multiple experiments were "
+            "pooled (disjoint subjects/voxels). Set dataset.experiments to a single "
+            "experiment (e.g. [384]) in the config and re-run."
+        )
 
-    subjects = None
-    responses_by_subject = None
-    if "subject" in a.coords:
-        subj_vals = np.asarray(a["subject"].values)
+    # --- subject / roi metadata (post-filter, post-voxel-drop) ---
+    subj_lvl = next((n for n in neur_levels if "subject" in n.lower()), None)
+    roi_lvl = next((n for n in neur_levels if n in ("roi", "atlas", "region")), None)
+    roi = _level_values(a, neur_dim, roi_lvl)[col_ok] if roi_lvl else None
+    subjects = responses_by_subject = None
+    if subj_lvl:
+        subj_vals = _level_values(a, neur_dim, subj_lvl)[col_ok]
         subjects = sorted(set(subj_vals.tolist()))
-        # group neuroids by subject so each subject's voxels form a repeat estimate is
-        # not directly possible (voxels differ per subject); instead expose per-subject
-        # response matrices padded to a common voxel count for noise-ceiling estimation.
         responses_by_subject = _per_subject_matrices(responses, subj_vals, subjects)
+
+    print(f"[pereira] final: {responses.shape[0]} sentences x {responses.shape[1]} voxels"
+          f"; sentence_level={sent_lvl!r}; example={sentences[0][:60]!r}")
 
     return BrainDataset(
         sentences=sentences,
@@ -213,7 +269,8 @@ def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
         subject_ids=subjects,
         name="pereira2018",
         is_synthetic=False,
-        meta={"atlas": atlas, "experiments": experiments},
+        meta={"atlas": atlas, "experiments": experiments,
+              "sentence_level": sent_lvl, "experiment_level": exp_lvl},
     )
 
 
