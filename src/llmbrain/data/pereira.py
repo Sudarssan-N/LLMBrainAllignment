@@ -50,6 +50,28 @@ def load_pereira2018(
         ) from e
 
 
+def _patch_importlib_entry_points() -> None:
+    """Restore the dict-style ``EntryPoints.get`` that brain-score's plugin loader needs.
+
+    brain-score-core calls ``importlib.metadata.entry_points().get(group, default)``. Up to
+    Python 3.9 ``entry_points()`` returned a ``dict`` (with ``.get``); since Python 3.12 it
+    returns a flat ``EntryPoints`` object that has no ``.get`` (use ``.select(group=...)``).
+    On Colab (py3.12) this raises ``'EntryPoints' object has no attribute 'get'`` for every
+    plugin access. We add a compatible ``.get`` that delegates to ``.select``. Idempotent.
+    """
+    import importlib.metadata as ilm
+
+    ep_cls = getattr(ilm, "EntryPoints", None)
+    if ep_cls is None or hasattr(ep_cls, "get"):
+        return
+
+    def _get(self, group, default=None):  # type: ignore[no-untyped-def]
+        selected = self.select(group=group)
+        return selected if len(selected) else (default if default is not None else selected)
+
+    ep_cls.get = _get  # type: ignore[attr-defined]
+
+
 def _load_via_brainscore(experiments, atlas) -> BrainDataset:
     """Adapt the brain-score Pereira2018 assembly to a BrainDataset.
 
@@ -58,6 +80,8 @@ def _load_via_brainscore(experiments, atlas) -> BrainDataset:
     one place to update if the harness API changes.
     """
     import importlib
+
+    _patch_importlib_entry_points()
 
     assembly = None
     errors = []

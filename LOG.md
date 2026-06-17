@@ -5,6 +5,28 @@ what was decided, what's blocked, what's next. Link runs to `TRACKER.md` IDs.
 
 ---
 
+## 2026-06-17 — Colab brain-score data access debugging
+
+**Context:** wiring real Pereira2018 via `brain-score/language` v2.2.1 on Colab (Python 3.12).
+
+**Findings (in order encountered)**
+1. `brainscore_language` not installed → loader raised by design. Made the notebook's
+   harness-install cell active (install-if-missing) instead of commented out.
+2. After install, all plugin access failed with `'EntryPoints' object has no attribute
+   'get'`. **Root cause:** brain-score-core calls `entry_points().get(group, default)`;
+   that dict-style API was removed in Python 3.12 (now returns a flat `EntryPoints`; use
+   `.select(group=...)`). Affects *every* plugin path, incl. direct plugin-module import
+   (brain-score's `data/__init__.py` runs plugin discovery on import).
+   **Fix:** monkeypatch `importlib.metadata.EntryPoints.get` to delegate to `.select`,
+   applied before importing brainscore (`_patch_importlib_entry_points` in `data/pereira.py`).
+3. pip dependency-conflict warnings (numpy<2, xarray<2022.6 vs jax/tifffile/arviz) are
+   harmless — brain-score intentionally pins numpy 1.26.4; not our blocker.
+
+**Next:** confirm the monkeypatch lets `load_dataset('Pereira2018.language')` download from
+S3; capture the printed `[pereira] dims/coords` schema to finalize coord mapping.
+
+---
+
 ## 2026-06-16 — Project kickoff & initial scaffold
 
 **Done**
