@@ -8,6 +8,7 @@ r, then normalize by a noise ceiling. Returns both per-voxel scores and cross-va
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -18,13 +19,14 @@ from sklearn.preprocessing import StandardScaler
 
 
 def pearson_per_column(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
-    """Per-column (per-voxel) Pearson correlation."""
+    """Per-column (per-voxel) Pearson correlation. Zero-variance columns -> NaN."""
     yt = y_true - y_true.mean(axis=0, keepdims=True)
     yp = y_pred - y_pred.mean(axis=0, keepdims=True)
     num = (yt * yp).sum(axis=0)
     den = np.sqrt((yt**2).sum(axis=0) * (yp**2).sum(axis=0))
-    den[den == 0] = np.nan
-    return num / den
+    den = np.where(den == 0, np.nan, den)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return num / den
 
 
 @dataclass
@@ -102,14 +104,19 @@ def ridge_encode(
         r_folds.append(pearson_per_column(Y_te, pred))
         r2_folds.append(_r2_per_column(Y_te, pred))
 
-    voxel_r = np.nanmean(np.stack(r_folds), axis=0)
-    voxel_r2 = np.nanmean(np.stack(r2_folds), axis=0)
+    # Some voxels are NaN in every fold (constant in a test split); average over folds
+    # ignoring NaN, then over voxels ignoring any that are NaN across all folds.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        voxel_r = np.nanmean(np.stack(r_folds), axis=0)
+        voxel_r2 = np.nanmean(np.stack(r2_folds), axis=0)
+        mean_r = float(np.nanmean(voxel_r)) if np.isfinite(voxel_r).any() else float("nan")
     return EncodingResult(
         n_voxels=Y.shape[1],
         n_folds=n_folds,
         voxel_r=voxel_r,
         voxel_r2=voxel_r2,
-        mean_r=float(np.nanmean(voxel_r)),
+        mean_r=mean_r,
     )
 
 

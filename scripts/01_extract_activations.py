@@ -26,6 +26,8 @@ def main():
     ap.add_argument("--model", default=None, help="model key from config")
     ap.add_argument("--synthetic", action="store_true", help="use synthetic stimuli")
     ap.add_argument("--batch-size", type=int, default=1)
+    ap.add_argument("--pooling", default=None, choices=["mean", "last", "sum"],
+                    help="override pooling.method from config (last = causal-LM standard)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -41,8 +43,11 @@ def main():
     print(f"[stage1] model={spec.key} device={device} n_sentences={ds.n_samples} "
           f"synthetic={ds.is_synthetic}")
 
-    pool = cfg.raw["pooling"]
+    pool = dict(cfg.raw["pooling"])
+    if args.pooling:
+        pool["method"] = args.pooling
     out_dir = cfg.derived_dir(spec.key)
+    print(f"[stage1] pooling={pool.get('method', 'mean')}")
 
     if ds.is_synthetic:
         # No-torch path: fabricate layer activations so the pipeline runs end-to-end.
