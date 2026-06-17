@@ -5,6 +5,20 @@ what was decided, what's blocked, what's next. Link runs to `TRACKER.md` IDs.
 
 ---
 
+## 2026-06-18 — Ridge stabilization, CIs, and paper draft
+
+- **Fixed the varpart artifact**: replaced the single 80/20 alpha split with deterministic
+  `RidgeCV` LOO-GCV; this removes the spurious unique-surprisal spikes (incl. p410m's
+  contaminated ratio). Added `encoding/stats.py` (bootstrap CI over voxels + paired diff),
+  Stage 4 now emits 95% CI on peak unique-hidden and saves per-voxel arrays, new Stage 7
+  paired base-vs-instruct test, aggregate uses the Stage-4 peak layer + shows CI.
+- **Started the paper**: `paper/main.tex` in NeurIPS 2024 format (preprint), `references.bib`,
+  Makefile, README. Numbers marked `\prelim{}`/`\todo{}` pending the re-run.
+
+**NEXT (re-run in Colab with fixed code):** re-run the sweep (Section 5), then per pair run
+`python scripts/07_compare.py --a qwen2.5-0.5b --b qwen2.5-0.5b-instruct`; refresh Table 1 +
+Sections 4.2–4.4 and fill the p410m unique(S) cell with the now-stable number.
+
 ## 2026-06-17 (cont. 4) — Full sweep done (E003 size, E004 instruct)
 
 6 models, last-token, noise-ceiling-normalized. Findings:

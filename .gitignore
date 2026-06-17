@@ -22,6 +22,15 @@ dist/
 # Notebooks output (keep the .ipynb, strip heavy outputs manually before commit)
 # notebooks/*.ipynb
 
+# LaTeX build artifacts (keep sources: .tex, .bib, .sty)
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.pdf
+paper/*.synctex.gz
+
 # OS / editor
 .DS_Store
 .vscode/
