@@ -37,10 +37,11 @@ Pereira2018 (per ROI / per voxel, normalized by noise ceiling).
 | ID | Date | Model | Layers | Analysis | Dataset | Config / commit | Status | Headline result | Notes |
 |----|------|-------|--------|----------|---------|-----------------|--------|-----------------|-------|
 | E000 | 2026-06-16 | — | — | scaffold | synthetic | `config/default.yaml` | ✅ | full pipeline runs; 9/9 tests pass; varpart shows unique_hidden≫unique_surprisal on synthetic | smoke-test passes before real data |
-| E001 | 2026-06-17 | gpt2 | all (0–12) | predict | Pereira2018 exp384 (384 sent × 12155 vox) | `experiments:[384]`, pooling=mean, no noise ceiling | 🟡 | raw mean_r flat ~0.20–0.22, best=L12 (0.221); L0 embeddings≈0.215 | flat curve ⇒ mean-pooling washout; needs last-token + noise ceiling. Re-run as E001b w/ `--pooling last` |
-| E002 | 2026-06-17 | gpt2 | all (0–12) | varpart | Pereira2018 exp384 | same as E001 | 🟡 | **unique_hidden≈0.04 ≫ unique_surprisal≈0.0006** (~70×); shared≈0.0015 | core result direction confirmed even at baseline; magnitudes low pending normalization |
-| E003 | | pythia-160m / 410m | all | predict+varpart | Pereira2018 | | ⬜ | size × residual alignment | "bigger ≠ more brain-like" |
-| E004 | | base vs instruct | best | varpart | Pereira2018 | | ⬜ | instruction-tuning effect | novelty axis |
+| E001 | 2026-06-17 | gpt2 | all (0–12) | predict | Pereira2018 exp384 (384 sent × 12155 vox) | `experiments:[384]`, pooling=mean, no ceiling | ❌ | raw mean_r flat ~0.20–0.22; L0≈best | superseded: mean-pooling washout. See E001b |
+| E001b | 2026-06-17 | gpt2 | all (0–12) | predict | Pereira2018 exp384 | pooling=**last**, cross-subject noise ceiling (9 subj, mean ceiling 0.219, n=10664 vox) | ✅ | **norm_r 0.14→1.02 monotonic, ~100% ceiling at L12**; mean_r 0.032→0.225 | reproduces Schrimpf "~100% of ceiling"; monotonic peak-at-last expected for 124M |
+| E002 | 2026-06-17 | gpt2 | all (0–12) | varpart | Pereira2018 exp384 | pooling=last | ✅ | **unique_hidden→0.039 @L12 ≫ unique_surprisal ~0.0005 (~70×); gap grows with depth**; shared~0.0016 | CORE RESULT. (L3 unique_surprisal=0.0048 outlier — recheck fold/alpha) |
+| E003 | | pythia-160m / 410m / opt-125m | all | predict+varpart | Pereira2018 exp384 | pooling=last, cross-subj ceiling | ⬜ | size × residual unique-hidden | "bigger ≠ more brain-like"; run via sweep cell + `06_aggregate` |
+| E004 | | qwen2.5-0.5b vs -instruct | all | predict+varpart | Pereira2018 exp384 | pooling=last | ⬜ | instruction-tuning effect on unique-hidden | novelty axis; open ungated pair |
 | E005 | | gpt2 | best | matched | Pereira2018 | | ⬜ | structure survives surprisal match | validation |
 | E006 | | gpt2 | all | rsa | Pereira2018 | | ⬜ | geometry alignment | RSA cross-check |
 

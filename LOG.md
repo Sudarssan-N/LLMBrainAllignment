@@ -5,6 +5,21 @@ what was decided, what's blocked, what's next. Link runs to `TRACKER.md` IDs.
 
 ---
 
+## 2026-06-17 (cont. 3) — Clean baseline achieved (E001b/E002)
+
+last-token pooling + cross-subject noise ceiling gave the publishable baseline:
+- **GPT-2 reaches ~100% of noise ceiling at L12** (norm_r 0.14→1.02, monotonic). Reproduces
+  Schrimpf "~100% of ceiling". Monotonic peak-at-last is expected for a 124M model.
+- **Variance partitioning (core result): unique_hidden→0.039 @L12 ≫ unique_surprisal ~0.0005
+  (~70×), and the gap grows with depth.** This is the paper's contribution, on real data.
+- Anomaly to revisit: L3 unique_surprisal=0.0048 (≈10× neighbours) — likely a fold/alpha
+  quirk; check CV stability.
+
+**Set up the model sweep** for the novelty axes: added Qwen2.5-0.5B base/instruct pair to
+config (open, ungated) for instruction-tuning; `scripts/06_aggregate.py` builds a cross-model
+comparison table + summary.csv; notebook sweep cell runs Pythia-160m/410m, OPT-125m, Qwen
+pair with `--pooling last` then aggregates. Next: run sweep (E003 size, E004 instruct).
+
 ## 2026-06-17 (cont. 2) — Noise ceiling + pooling override
 
 **Built the cross-subject (brain-to-brain) noise ceiling** (`encoding/noise.py`). Pereira

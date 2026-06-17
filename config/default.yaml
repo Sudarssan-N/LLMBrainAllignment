@@ -40,6 +40,17 @@ models:
     family: opt
     type: base
     layers: null
+  # Base vs instruction-tuned pair (open, ungated) for the instruction-tuning axis.
+  qwen2.5-0.5b:
+    hf_id: Qwen/Qwen2.5-0.5B
+    family: qwen2.5
+    type: base
+    layers: null
+  qwen2.5-0.5b-instruct:
+    hf_id: Qwen/Qwen2.5-0.5B-Instruct
+    family: qwen2.5
+    type: instruct
+    layers: null
 
 default_model: gpt2
 
