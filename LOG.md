@@ -5,6 +5,27 @@ what was decided, what's blocked, what's next. Link runs to `TRACKER.md` IDs.
 
 ---
 
+## 2026-06-17 (cont. 4) — Full sweep done (E003 size, E004 instruct)
+
+6 models, last-token, noise-ceiling-normalized. Findings:
+- **Core thesis holds across all models**: unique_hidden ≫ unique_surprisal (~50–70× at
+  clean layers).
+- **Size (E003): bigger ≠ more brain-like in unique-hidden.** peak_unique_hidden is NOT
+  monotonic in params (gpt2 124M=.039, pythia-160m=.029, pythia-410m=.026, qwen-0.5b=.049).
+  Raw norm_r does rise for qwen (1.14). So predictivity ↑ with size/quality but *unique
+  representational* contribution does not.
+- **Instruction tuning (E004): marginally REDUCES alignment + unique-hidden** (qwen base
+  norm_r 1.145 / uh 0.0489 vs instruct 1.127 / 0.0467; both peak L23). ~4–5% relative.
+
+**Two things to fix before these are publication-final:**
+1. **Variance-partitioning alpha instability** → deterministic unique_surprisal spikes on
+   isolated layers (gpt2 L3, p410m L19/21, opt L10/11, qwen L0/4/20/24 ≈ 0.005–0.018 vs
+   ~0.0005 elsewhere). Root cause: alpha picked by a single 80/20 split per ridge call, so
+   joint vs hidden models sometimes pick different alphas. Contaminates the p410m headline
+   ratio (shows 2.7× instead of ~50×). Fix: stabilize alpha selection (k-fold or shared alpha).
+2. **No CIs yet.** The E004 instruction-tuning effect (~5%) needs bootstrap CIs over
+   sentences before it can be claimed. Also add experiment 243 for robustness.
+
 ## 2026-06-17 (cont. 3) — Clean baseline achieved (E001b/E002)
 
 last-token pooling + cross-subject noise ceiling gave the publishable baseline:
