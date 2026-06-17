@@ -252,11 +252,11 @@ def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
     subj_lvl = next((n for n in neur_levels if "subject" in n.lower()), None)
     roi_lvl = next((n for n in neur_levels if n in ("roi", "atlas", "region")), None)
     roi = _level_values(a, neur_dim, roi_lvl)[col_ok] if roi_lvl else None
-    subjects = responses_by_subject = None
+    subjects = responses_by_subject = voxel_subject = None
     if subj_lvl:
-        subj_vals = _level_values(a, neur_dim, subj_lvl)[col_ok]
-        subjects = sorted(set(subj_vals.tolist()))
-        responses_by_subject = _per_subject_matrices(responses, subj_vals, subjects)
+        voxel_subject = _level_values(a, neur_dim, subj_lvl)[col_ok]
+        subjects = sorted(set(voxel_subject.tolist()))
+        responses_by_subject = _per_subject_matrices(responses, voxel_subject, subjects)
 
     print(f"[pereira] final: {responses.shape[0]} sentences x {responses.shape[1]} voxels"
           f"; sentence_level={sent_lvl!r}; example={sentences[0][:60]!r}")
@@ -267,6 +267,7 @@ def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
         responses_by_subject=responses_by_subject,
         roi=roi,
         subject_ids=subjects,
+        voxel_subject=voxel_subject,
         name="pereira2018",
         is_synthetic=False,
         meta={"atlas": atlas, "experiments": experiments,

@@ -5,6 +5,21 @@ what was decided, what's blocked, what's next. Link runs to `TRACKER.md` IDs.
 
 ---
 
+## 2026-06-17 (cont. 2) — Noise ceiling + pooling override
+
+**Built the cross-subject (brain-to-brain) noise ceiling** (`encoding/noise.py`). Pereira
+voxels are subject-specific with no within-subject repeats, so split-half is undefined;
+instead, per held-out subject, predict their voxels from the *other* subjects' responses to
+the same sentences (PCA-reduced CV ridge). Normalized predictivity = model_r / ceiling over
+voxels with ceiling ≥ 0.1. Stage 3 now auto-selects: cross-subject for real Pereira
+(`voxel_subject` set), split-half for the synthetic fixture. Added `voxel_subject` to
+`BrainDataset` + loader. Tests added (ceiling positive on shared-latent disjoint voxels).
+
+**Pooling washout diagnosis:** baseline used mean-pooling → flat layer curve, embeddings
+tie best layer. Added `--pooling {mean,last,sum}` to Stage 1; `last` (final token, has
+attended to whole sentence) is the causal-LM standard and should recover the
+intermediate-layer advantage. To compare next.
+
 ## 2026-06-17 (cont.) — Real Pereira2018 loaded; MultiIndex + NaN handling
 
 Data now loads: assembly is `(presentation=627, neuroid=13553)`. Two structural fixes:

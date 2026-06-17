@@ -27,6 +27,7 @@ class BrainDataset:
     responses_by_subject: list[np.ndarray] | None = None
     roi: np.ndarray | None = None
     subject_ids: list[str] | None = None
+    voxel_subject: np.ndarray | None = None  # (n_voxels,) subject id per voxel column
     name: str = "unknown"
     is_synthetic: bool = False
     meta: dict = field(default_factory=dict)

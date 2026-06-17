@@ -69,8 +69,10 @@ encoding:
   metric: pearson               # pearson r per voxel
 
 noise_ceiling:
-  method: split_half            # split_half | none
-  n_splits: 10
+  method: cross_subject         # cross_subject (real Pereira) | split_half (synthetic repeats)
+  n_splits: 10                  # split-half resamples (synthetic path)
+  pca_components: 100           # donor-subject feature reduction for cross-subject ceiling
+  min_ceiling: 0.1             # only normalize over voxels with ceiling >= this
 
 rsa:
   rdm_metric: correlation       # correlation | euclidean

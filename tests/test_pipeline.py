@@ -9,6 +9,7 @@ import numpy as np
 
 from llmbrain.data.synthetic import make_synthetic_dataset
 from llmbrain.encoding.ridge import ridge_encode, split_half_noise_ceiling, pearson_per_column
+from llmbrain.encoding.noise import cross_subject_noise_ceiling, normalized_predictivity
 from llmbrain.encoding.variance_partitioning import variance_partitioning
 from llmbrain.encoding.rsa import compute_rdm, compare_rdms, rsa_score
 from llmbrain.analysis.matched_subsets import match_by_binning, matched_balance_report
@@ -56,6 +57,35 @@ def test_noise_ceiling_in_range():
     nc = split_half_noise_ceiling(ds.responses_by_subject, n_splits=5, seed=0)
     assert nc.shape[0] == ds.n_voxels
     assert np.all(nc > 0) and np.all(nc <= 1.0)
+
+
+def test_cross_subject_noise_ceiling_positive_and_normalization():
+    # Two subjects, disjoint voxels, sharing a common latent -> positive cross-subject ceiling.
+    rng = np.random.default_rng(0)
+    n, k = 80, 4
+    latent = rng.normal(size=(n, k))
+    Wa = rng.normal(size=(k, 6))
+    Wb = rng.normal(size=(k, 6))
+    Ya = latent @ Wa + rng.normal(scale=0.3, size=(n, 6))
+    Yb = latent @ Wb + rng.normal(scale=0.3, size=(n, 6))
+    Y = np.concatenate([Ya, Yb], axis=1)
+    voxel_subject = np.array(["A"] * 6 + ["B"] * 6)
+
+    ceiling = cross_subject_noise_ceiling(Y, voxel_subject, ALPHAS, pca_components=6, n_folds=4)
+    assert np.isfinite(ceiling).all()
+    assert np.nanmean(ceiling) > 0.2, np.nanmean(ceiling)
+
+    # normalization: model_r below ceiling -> normalized < ~1; uses only reliable voxels
+    model_r = ceiling * 0.5
+    agg = normalized_predictivity(model_r, ceiling, min_ceiling=0.1)
+    assert agg["n_voxels_used"] > 0
+    assert 0.4 < agg["normalized_r"] < 0.6
+
+
+def test_cross_subject_ceiling_single_subject_is_nan():
+    Y = np.random.default_rng(1).normal(size=(20, 4))
+    ceiling = cross_subject_noise_ceiling(Y, np.array(["A"] * 4), ALPHAS)
+    assert np.isnan(ceiling).all()
 
 
 def test_rsa_self_is_one():
