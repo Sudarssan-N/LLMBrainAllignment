@@ -5,32 +5,29 @@ the format is easy to swap later.
 
 ## Build
 
-1. Download the official NeurIPS 2024 style file and place it here:
-   - `neurips_2024.sty` from https://neurips.cc/Conferences/2024/PaperInformation/StyleFiles
-   - (The `[preprint]` option in `main.tex` shows author names while drafting.)
-2. Build:
-   ```bash
-   make            # or: pdflatex main && bibtex main && pdflatex main && pdflatex main
-   ```
+The official NeurIPS 2024 style file (`neurips_2024.sty`) is **bundled in this folder**, so the
+paper compiles with no manual download.
 
-If you don't have the style file yet, you can temporarily switch the documentclass line to
-plain `article` to preview content (formatting will differ).
+- **Overleaf:** upload the whole `paper/` folder (including `neurips_2024.sty` and `figures/`)
+  and compile `main.tex`. The `[preprint]` option shows author names while drafting.
+- **Local:**
+  ```bash
+  make            # or: pdflatex main && bibtex main && pdflatex main && pdflatex main
+  ```
 
 ## Status / conventions
 
-- `\prelim{...}` (blue) marks **preliminary numbers** to refresh after the
-  stabilized-ridge + CI re-run.
-- `\todo{...}` (red) marks gaps to fill. Strip both macros before submission.
-- Numbers currently reflect the first full sweep (E001b–E004). After re-running the sweep
-  with the RidgeCV fix + Stage 7 paired test, update Table 1 and Sections 4.2–4.4, and fill
-  the Pythia-410M `unique(S)` cell (was contaminated by the old alpha-selection artifact).
+- The draft is finalized to the clean re-run (stabilized LOO-GCV ridge + voxel-bootstrap CIs +
+  Stage-7 paired test). Table 1 and Sections 4.1–4.5 reflect E003b / E004 / E006.
+- `\prelim{...}` (blue) / `\todo{...}` (red) macros remain *defined* for future drafting but are
+  no longer used in the body. Strip the definitions before camera-ready if desired.
 
-## Figures (to add)
+## Figures
 
-Generate from `data/derived/` after a sweep:
+Rendered into `figures/` by `python scripts/08_figures.py` from `data/derived/`:
 - `fig_layercurve.pdf` — normalized predictivity vs layer (per model).
 - `fig_varpart.pdf` — variance-partitioning stackplot (unique-H / shared / unique-S).
-- `fig_sweep.pdf` — peak unique-hidden vs model size + base-vs-instruct.
+- `fig_sweep.pdf` — peak unique-hidden vs model size (with 95% CIs).
+- `fig_rsa.pdf` — RSA (Spearman ρ) vs layer (per model).
 
-A plotting cell exists in `notebooks/run_experiments.ipynb`; we will add a `scripts/08_figures.py`
-to render these to `paper/figures/` directly.
+All four are wired into `main.tex` via `\includegraphics{figures/...}`.
