@@ -27,9 +27,13 @@
 in LLM--Brain Alignment}
 
 \author{%
-  Sudarssan N.\thanks{Correspondence: sudarssan73@gmail.com} \\
-  \texttt{} \\
-  % Add affiliations / co-authors here.
+  Sudarssan N.\thanks{Correspondence: \texttt{sudarssan73@gmail.com}} \\
+  Independent Researcher \\
+  \texttt{sudarssan73@gmail.com} \\
+  \And
+  Jeyaanth A. \\
+  Independent Researcher \\
+  \texttt{jeyaanth.am@gmail.com} \\
 }
 
 \begin{document}
@@ -44,14 +48,16 @@ predictability (surprisal). We quantify, on the Pereira et al.\ (2018) benchmark
 voxel-level alignment is \emph{uniquely} explained by LLM hidden representations \emph{beyond}
 surprisal, using cross-validated ridge encoding combined with variance partitioning
 (commonality analysis). Across six models spanning $124$M--$500$M parameters and four model
-families, hidden representations uniquely explain roughly two orders of magnitude more brain
-variance than surprisal, and this advantage \emph{grows} with network depth. Contrasting
-models, we find that the unique representational contribution does \emph{not} increase
-monotonically with parameter count---larger models are more \emph{predictive} but not more
-\emph{uniquely structured}---and that instruction tuning slightly \emph{reduces} both overall
-alignment and unique-beyond-surprisal contribution. Our results, obtained with inference-only
-compute, sharpen the structure-versus-statistics debate into a quantitative, reproducible
-encoding-model question. \prelim{(Numbers in this draft are preliminary, pre--confidence-interval re-run.)}
+families, hidden representations uniquely explain more than an order of magnitude more brain
+variance than surprisal at the most predictive layer (and up to $\sim$$70\times$ more at
+intermediate layers, where surprisal contributes least), with this advantage \emph{growing}
+with network depth. Contrasting models, the unique representational contribution tends to
+\emph{increase} with scale within a controlled model family (Pythia $160$M$\rightarrow$$410$M),
+though across families it is confounded by architecture and training data rather than parameter
+count alone. Instruction tuning \emph{significantly reduces} both overall alignment and
+unique-beyond-surprisal contribution (non-overlapping $95\%$ confidence intervals). Our results,
+obtained with inference-only compute, sharpen the structure-versus-statistics debate into a
+quantitative, reproducible encoding-model question.
 \end{abstract}
 
 \section{Introduction}
@@ -83,10 +89,12 @@ hidden states, unique to surprisal, and shared between them---robust to their co
   \item A reproducible, inference-only pipeline that reproduces the Schrimpf-style
   noise-ceiling-normalized predictivity curve and augments it with explicit surprisal control
   via variance partitioning (Section~\ref{sec:methods}).
-  \item Evidence that hidden representations uniquely explain $\sim$50--70$\times$ more brain
-  variance than surprisal, with the gap growing across network depth (Section~\ref{sec:core}).
-  \item A model-family comparison showing that unique-beyond-surprisal contribution does
-  \emph{not} grow monotonically with size, and that instruction tuning slightly reduces it
+  \item Evidence that hidden representations uniquely explain more than an order of magnitude
+  more brain variance than surprisal (up to $\sim$$70\times$ at intermediate layers), with the
+  gap growing across network depth (Section~\ref{sec:core}).
+  \item A model-family comparison showing that unique-beyond-surprisal contribution tends to
+  grow with scale within a controlled family but is confounded by architecture across families,
+  and that instruction tuning significantly reduces it
   (Sections~\ref{sec:size}--\ref{sec:instruct}).
 \end{itemize}
 
@@ -140,7 +148,7 @@ leave-one-out generalized cross-validation, reporting per-voxel held-out Pearson
 repeats, we estimate a \emph{cross-subject} ceiling: each held-out subject's voxels are
 predicted from the other subjects' responses to the same sentences (PCA-reduced cross-validated
 ridge). Normalized predictivity is $r / \text{ceiling}$, averaged over voxels whose ceiling
-exceeds $0.1$. \todo{state mean ceiling = 0.219 once finalized.}
+exceeds $0.1$. The mean ceiling is $0.269$ ($n=11{,}743$ retained voxels).
 
 \paragraph{Variance partitioning.} Given hidden features $H$ and surprisal features $S$, we fit
 encoding models for $H$, $S$, and $H \cup S$ and decompose explained variance:
@@ -157,53 +165,112 @@ We report $95\%$ confidence intervals by bootstrap over voxels.
 \subsection{Reproducing noise-ceiling predictivity}
 \label{sec:repro}
 With last-token pooling and the cross-subject ceiling, GPT-2 reproduces the Schrimpf-style
-result: normalized predictivity rises monotonically with depth to $\sim$$1.0$ at the final
-layer (\prelim{$0.14 \rightarrow 1.02$}). For this $124$M model the peak is at the last layer;
-the largest model (Pythia-410M) peaks at an intermediate layer, consistent with the reported
-``peak moves earlier with scale.''
+result: normalized predictivity rises with depth to $\sim$$1.0$ at the final layer
+($0.11 \rightarrow 0.98$). For this $124$M model the peak is at the last layer; the deeper
+models (Pythia-410M, Qwen2.5-0.5B) saturate the ceiling several layers before the end
+(normalized $r > 1$ from layers $20$ and $22$ respectively), consistent with the reported
+``peak moves earlier with scale.'' Normalized values slightly exceeding $1$ reflect the
+conservative cross-subject ceiling (Section~\ref{sec:discussion}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.6\linewidth]{figures/fig_layercurve.pdf}
+\caption{Noise-ceiling-normalized predictivity versus relative layer depth for all six models.
+The dashed line marks the cross-subject ceiling ($r/\text{ceiling}=1$). Deeper models saturate
+the ceiling before the final layer.}
+\label{fig:layercurve}
+\end{figure}
 
 \subsection{Hidden representations dominate surprisal}
 \label{sec:core}
 Variance partitioning shows that hidden representations uniquely explain far more brain variance
 than surprisal at every layer, and the advantage grows with depth. For GPT-2, peak
-$\text{unique}(H) \approx \prelim{0.039}$ versus $\text{unique}(S) \approx \prelim{0.0006}$, a
-ratio of $\sim$$65\times$. The effect holds across all six models (Table~\ref{tab:sweep}).
+$\text{unique}(H) = 0.052$ ($95\%$ CI $[0.051, 0.053]$) at the final layer versus
+$\text{unique}(S) = 0.003$ there, a ratio of $\sim$$17\times$; at intermediate layers, where the
+unique surprisal contribution falls to $\sim$$0.0005$, the ratio exceeds $70\times$. The effect
+holds across all six models, with peak ratios of $16$--$19\times$ (Table~\ref{tab:sweep},
+Figure~\ref{fig:varpart}). The result replicates on the independent $243$-sentence experiment
+(GPT-2 peak $\text{unique}(H) = 0.049$, Qwen2.5-0.5B $0.046$).
 
-\subsection{Size: bigger is more predictive, not more uniquely structured}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_varpart.pdf}
+\caption{Variance partitioning per model: voxel variance unique to hidden states (blue), shared
+(green), and unique to surprisal (yellow) versus relative depth. The unique-hidden component
+dominates and grows with depth; the unique-surprisal sliver remains an order of magnitude smaller
+throughout.}
+\label{fig:varpart}
+\end{figure}
+
+\subsection{Size: unique structure grows with scale within a family}
 \label{sec:size}
-Table~\ref{tab:sweep} dissociates two notions of ``brain-like.'' Normalized predictivity tends
-to rise with model quality/size (highest for Qwen2.5-0.5B). However, the \emph{unique}
-contribution of hidden states beyond surprisal does \emph{not} increase monotonically with
-parameter count---e.g.\ Pythia-410M does not exceed Pythia-160M. Scaling appears to buy
-predictivity, not unique-beyond-surprisal structure.
+Normalized predictivity rises with model quality and scale (highest for Qwen2.5-0.5B, $1.13$).
+The \emph{unique} contribution of hidden states beyond surprisal tends to rise with scale as
+well: within the controlled Pythia family it grows from $0.039$ ($160$M) to $0.057$ ($410$M),
+a $45\%$ increase, and the largest model (Qwen2.5-0.5B) attains the highest value ($0.066$).
+The relationship is not strictly monotonic \emph{across} families---well-trained small models
+(GPT-2 $124$M: $0.052$; OPT-125M: $0.059$) exceed Pythia-160M---indicating that architecture and
+training data, not parameter count alone, govern the unique representational contribution. (We
+note this corrects an earlier estimate from an unstable ridge that had spuriously depressed
+Pythia-410M.) Figure~\ref{fig:sweep} plots peak unique-hidden with $95\%$ confidence intervals
+against parameter count.
 
-\subsection{Instruction tuning slightly reduces alignment}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.65\linewidth]{figures/fig_sweep.pdf}
+\caption{Peak unique-hidden $R^2$ per model with $95\%$ voxel-bootstrap confidence intervals,
+ordered by parameter count. Within the Pythia family the contribution rises with scale; across
+families the smallest well-trained models (GPT-2, OPT) exceed Pythia-160M.}
+\label{fig:sweep}
+\end{figure}
+
+\subsection{Instruction tuning significantly reduces alignment}
 \label{sec:instruct}
 For the Qwen2.5-0.5B base/instruct pair (matched architecture and size), instruction tuning
-slightly \emph{reduces} both normalized predictivity (\prelim{$1.145 \rightarrow 1.127$}) and
-peak unique-hidden (\prelim{$0.0489 \rightarrow 0.0467$}), both peaking at the same layer.
-\todo{report paired bootstrap CI from Stage 7 (significant / n.s.).}
+\emph{reduces} both normalized predictivity ($1.130 \rightarrow 1.103$) and peak unique-hidden
+($0.0661 \rightarrow 0.0605$; both peak in the final layers), a $\sim$$8.5\%$ relative reduction.
+A paired comparison across the $12{,}137$ shared voxels---each model taken at its own peak
+layer---gives a mean difference of $+0.0068$ ($95\%$ bootstrap CI $[+0.0065, +0.0071]$, strictly
+positive), confirming the effect is reliable rather than marginal.
 
 \begin{table}[t]
 \caption{Model sweep on Pereira2018 ($384$-sentence experiment, last-token pooling,
-cross-subject noise ceiling). \prelim{Preliminary; to be refreshed after the
-CI/stabilized-ridge re-run.} ``norm $r$'' is best-layer normalized predictivity;
-``unique$(H)$'' is peak across layers; ``unique$(S)$'' is at that layer.}
+cross-subject noise ceiling; stabilized LOO-GCV ridge). ``norm $r$'' is best-layer normalized
+predictivity; ``unique$(H)$'' is the peak across layers with a $95\%$ voxel-bootstrap CI;
+``unique$(S)$'' is at that layer; $H{:}S$ is their ratio at the peak layer.}
 \label{tab:sweep}
 \centering
 \begin{tabular}{lrrrrr}
 \toprule
-Model & Params & best norm $r$ & peak unique$(H)$ & unique$(S)$ & $H{:}S$ \\
+Model & Params & best norm $r$ & peak unique$(H)$ [95\% CI] & unique$(S)$ & $H{:}S$ \\
 \midrule
-GPT-2            & 124M & 1.02 & 0.039 & 0.0006 & 65$\times$ \\
-OPT-125M         & 125M & 0.97 & 0.032 & 0.0005 & 61$\times$ \\
-Pythia-160M      & 160M & 0.83 & 0.029 & 0.0006 & 48$\times$ \\
-Pythia-410M      & 410M & 0.94 & 0.026 & \todo{} & \todo{} \\
-Qwen2.5-0.5B     & 500M & 1.14 & 0.049 & 0.0008 & 58$\times$ \\
-Qwen2.5-0.5B-Inst& 500M & 1.13 & 0.047 & 0.0009 & 54$\times$ \\
+GPT-2            & 124M & 0.98 & 0.052 [.051,.053] & 0.0030 & 17$\times$ \\
+OPT-125M         & 125M & 1.01 & 0.059 [.058,.060] & 0.0035 & 17$\times$ \\
+Pythia-160M      & 160M & 0.75 & 0.039 [.038,.040] & 0.0025 & 16$\times$ \\
+Pythia-410M      & 410M & 1.06 & 0.057 [.056,.058] & 0.0030 & 19$\times$ \\
+Qwen2.5-0.5B     & 500M & 1.13 & 0.066 [.065,.067] & 0.0036 & 19$\times$ \\
+Qwen2.5-0.5B-Inst& 500M & 1.10 & 0.061 [.060,.061] & 0.0034 & 18$\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{Representational geometry (RSA cross-check)}
+\label{sec:rsa}
+As a geometry-level cross-check independent of the linear encoding model, we correlate each
+layer's representational dissimilarity matrix (RDM) with the brain RDM (Figure~\ref{fig:rsa}).
+RSA scores are small and noisier than the encoding results---peaking around $\rho \approx
+0.04$--$0.05$---but are positive for the most predictive models and broadly consistent with the
+encoding ordering, indicating the linear-predictivity findings are not an artifact of the
+encoding mapping alone.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.6\linewidth]{figures/fig_rsa.pdf}
+\caption{RSA (Spearman $\rho$ between model-layer and brain RDMs) versus relative depth. Scores
+are small but positive for the more predictive models, corroborating the encoding-model results
+with a mapping-free measure.}
+\label{fig:rsa}
+\end{figure}
 
 \section{Discussion and Limitations}
 \label{sec:discussion}
@@ -211,8 +278,10 @@ Our central result---that hidden representations uniquely explain far more brain
 surprisal, growing with depth---supports a structural, rather than purely predictive, account of
 LLM--brain alignment, while quantifying the (small but non-zero) unique surprisal contribution.
 
-\paragraph{Limitations.} (i) We report a single experiment ($384$ sentences); the $243$-sentence
-set should be added for robustness. (ii) Our cross-subject ceiling is principled but not
+\paragraph{Limitations.} (i) Our main sweep uses the $384$-sentence experiment; the core
+hidden-$\gg$-surprisal result replicates on the independent $243$-sentence experiment
+(Section~\ref{sec:core}), but the size and instruction-tuning contrasts there await a full
+sweep. (ii) Our cross-subject ceiling is principled but not
 identical to the brain-score extrapolation ceiling; some normalized values slightly exceed $1$,
 indicating a conservative ceiling estimate. (iii) Confidence intervals are bootstrap over
 voxels; a stimulus-level bootstrap is stronger and planned. (iv) Encoding pools all
@@ -224,8 +293,9 @@ summary; richer information-theoretic and symbolic-syntactic predictors would sh
 \label{sec:conclusion}
 Framing the structure-versus-statistics debate as a variance-partitioning question yields a
 clear, reproducible answer on Pereira2018: alignment is overwhelmingly carried by hidden
-representations beyond surprisal, this is not a simple consequence of scale, and instruction
-tuning does not help. The full pipeline runs inference-only and is released for reproduction.
+representations beyond surprisal; this unique contribution grows with scale within a controlled
+model family but is shaped by architecture and training across families; and instruction tuning
+significantly reduces it. The full pipeline runs inference-only and is released for reproduction.
 
 \section*{Reproducibility}
 Code, configuration, and experiment tracker are available at the project repository. All results

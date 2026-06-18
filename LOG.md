@@ -5,6 +5,33 @@ what was decided, what's blocked, what's next. Link runs to `TRACKER.md` IDs.
 
 ---
 
+## 2026-06-19 — Clean re-run with stabilized ridge + CIs; paper finalized to current data
+
+Re-ran the full sweep (E003b, E004) and the 243-set robustness (E006) in Colab with the
+LOO-GCV ridge + voxel-bootstrap CIs. Three things changed, one of them a headline:
+
+- **The "bigger ≠ more uniquely structured" claim FLIPS.** It was largely an artifact of the
+  unstable ridge. Clean peak unique(H): gpt2 .052, opt .059, p160m .039, **p410m .057** (was a
+  contaminated .026), qwen .066. Within the controlled Pythia family unique(H) now RISES with
+  scale (.039→.057, 160M→410M, +45%) and the largest model (qwen) is highest. Across families
+  it's not monotonic (gpt2/opt > p160m) → architecture/training matter, not params alone.
+- **p410m artifact gone**: unique(S)@peak .003, ratio 19× (was 2.7×).
+- **Instruction tuning now SIGNIFICANT**: qwen base unique(H) 0.0661 [.0652,.0670] vs instruct
+  0.0605 [.0597,.0614] — non-overlapping CIs, ~8.5% rel reduction (was a vague ~4–5%).
+- **Ratio reframed**: ~17× at the peak-hidden layer (where unique(S) is largest), up to ~70× at
+  mid-depth. Abstract no longer claims a flat "50–70×".
+- **E006 robustness**: core hidden≫surprisal replicates on the independent 243-set (gpt2 .049,
+  qwen .046). Ceiling mean 0.272 (243) / 0.269 (384).
+
+Folded all of this into `paper/main.tex`: abstract, contributions, §4.1–4.4, Table 1, limitations,
+conclusion; stripped all `\prelim`/`\todo` uses (macros kept defined); set ceiling = 0.269.
+
+Stage 7 paired per-voxel test done: mean diff +0.0068 [+0.0065,+0.0071] over 12,137 voxels,
+strictly positive → instruct effect significant. Folded into §4.4.
+
+**NEXT:** regenerate figures (Stage 8) from the clean artifacts; decide co-authors/affiliations
+for the author block.
+
 ## 2026-06-18 — Ridge stabilization, CIs, and paper draft
 
 - **Fixed the varpart artifact**: replaced the single 80/20 alpha split with deterministic
