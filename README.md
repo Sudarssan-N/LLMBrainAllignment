@@ -84,9 +84,15 @@ python scripts/03_fit_encoding.py --synthetic   # encoding on toy data
 |-------|--------|--------|
 | 1 | `01_extract_activations.py` | `data/derived/<model>/activations.npz` (layer × sentence × hidden) |
 | 2 | `02_compute_surprisal.py` | `data/derived/<model>/surprisal.npz` (per-sentence surprisal features) |
-| 3 | `03_fit_encoding.py` | `data/derived/<model>/encoding_<layer>.json` (per-voxel/per-ROI predictivity) |
-| 4 | `04_variance_partitioning.py` | `data/derived/<model>/varpart_<layer>.json` (unique/shared R²) |
-| 5 | `05_rsa.py` | `data/derived/<model>/rsa_<layer>.json` (RDM correlations) |
+| 3 | `03_fit_encoding.py` | `data/derived/<model>/encoding.json` (per-layer predictivity, noise-ceiling-normalized) |
+| 4 | `04_variance_partitioning.py` | `data/derived/<model>/varpart.json` (unique/shared R² + peak-layer 95% CI) |
+| 5 | `05_rsa.py` | `data/derived/<model>/rsa.json` (RDM correlations) |
+| 6 | `06_aggregate.py` | `data/derived/summary.csv` (one row per model) |
+| 7 | `07_compare.py` | `data/derived/compare_<a>_vs_<b>.json` (paired base-vs-instruct bootstrap test) |
+| 8 | `08_figures.py` | `paper/figures/*.pdf` (publication figures) |
+
+The Colab notebook `notebooks/run_experiments.ipynb` drives all of this with plots and the
+model sweep; regenerate it with `python scripts/_build_notebook.py`.
 
 ## Data
 
