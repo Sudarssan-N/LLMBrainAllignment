@@ -49,12 +49,18 @@ if not os.path.exists(REPO):
 !pip -q install -e .[models,plot]""")
 
 md("""### 1a. Brain-score harness (real Pereira2018)
-Heavy install (a few minutes); skips if already present. **Restart the runtime if Colab prompts.**""")
-code("""import importlib.util
+Heavy install (a few minutes). brain-score pins `numpy<2`, which clashes with Colab's
+numpy-2 C-extensions, so **this cell auto-restarts the runtime once after installing.**
+That is expected — when it restarts, just run *Runtime → Run all* (or re-run from §1; installs
+are cached and fast). It will not restart a second time.""")
+code("""import importlib.util, os
 if importlib.util.find_spec('brainscore_language') is None:
     !pip -q install git+https://github.com/brain-score/language
+    !pip -q install "numpy<2"   # keep numpy consistent with brain-score's pin
+    print('Installed brain-score. RESTARTING runtime — then Run all again.')
+    os.kill(os.getpid(), 9)     # force Colab runtime restart for a clean numpy
 else:
-    print('brainscore_language already installed')""")
+    print('brainscore_language present; environment consistent, no restart needed')""")
 
 md("## 2. Smoke test (synthetic, no models, no real data)\\nConfirms the whole chain works before pulling weights.")
 code("""!python -m pytest tests/ -q
