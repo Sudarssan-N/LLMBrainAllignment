@@ -131,18 +131,34 @@ space, so that our reported unique-hidden variance is what remains \emph{after} 
 that \citet{feghhi2024} identify. Variance partitioning / commonality analysis itself is a
 standard tool for separating feature spaces in encoding models \citep{deheer2017}.
 
+\paragraph{Surprisal-augmented encoding (closest prior art).} Two recent studies share our core
+move of partitioning brain-predictive variance between an LLM feature space and an explicit
+surprisal predictor. \citet{lepori2026} build an encoding framework that includes surprisal
+alongside (sparse-autoencoder) LM features and report which cortical regions are explained by
+surprisal alone versus surprisal-plus-model features. \citet{zhao2026} pursue the same
+disentangling goal with predictability-matched EEG stimuli and a GPT-2-XL linear encoder,
+isolating composition effects above and beyond next-word predictability. We differ in three
+respects that we treat as our contribution rather than a contrast in goals: (i) our controlled
+space folds in the specific \emph{positional} and \emph{word-rate} confounds of
+\citet{feghhi2024}, not surprisal alone; (ii) we relate the \emph{surviving} unique-hidden
+residual to a confound-free within-family scaling axis (the Pythia suite); and (iii) we add a
+two-scale instruction-tuning contrast---all on Pereira2018 fMRI and inference-only. To our
+knowledge this combination has not been reported together.
+
 \paragraph{Instruction tuning.} Our instruction-tuning finding runs against
 \citet{aw2024}, who report that instruction tuning \emph{increases} overall brain alignment
-(including on Pereira2018). We reconcile this in Section~\ref{sec:instruct}: the two measures
-differ. \citet{aw2024} measure total predictivity, which can rise as instruction tuning aligns
-output distributions; we measure the \emph{unique-beyond-surprisal} residual, which we find
-falls. The literature on instruction tuning and alignment is mixed, motivating our two-scale
-test rather than a single pair.
+aggregated across datasets. We reconcile this in Section~\ref{sec:instruct} as a difference of
+dataset and metric scope rather than a within-pipeline contradiction: \citet{aw2024} aggregate
+a brain-alignment score over multiple datasets with a different regression/ceiling protocol,
+whereas we report single-dataset (Pereira2018), noise-ceiling-normalized predictivity and, as
+our primary measure, the \emph{unique-beyond-surprisal} residual---which falls. The literature
+on instruction tuning and alignment is mixed, motivating our two-scale test rather than a single
+pair.
 
 \paragraph{Our position.} We isolate the \emph{unique} voxel-level variance explained by hidden
 states beyond surprisal \emph{and} low-level confounds within one encoding framework, and
-connect the residual to size, depth, and instruction tuning---a confound-controlled combination
-not, to our knowledge, previously reported together.
+connect the residual to size, depth, and instruction tuning---the confound-controlled
+combination set out above.
 
 \section{Methods}
 \label{sec:methods}
@@ -198,6 +214,32 @@ and---because the ridge fits each voxel independently---we additionally re-aggre
 per-voxel unique-hidden \emph{per subject} (each subject weighted equally) to check for
 pooling artifacts.
 
+\paragraph{Hyperparameters.} Table~\ref{tab:hyper} lists the full configuration; the single
+notebook regenerates every number from these settings.
+
+\begin{table}[t]
+\caption{Pipeline configuration. All headline runs use these settings; per-voxel ridge with
+LOO-GCV makes the encoding model effectively hyperparameter-free given the $\alpha$ grid.}
+\label{tab:hyper}
+\centering
+\begin{tabular}{l p{0.62\linewidth}}
+\toprule
+Component & Setting \\
+\midrule
+Token pooling & last-token, per sentence \\
+Surprisal summaries & mean, sum, final-token \\
+Predictive-entropy summaries & mean, final-token \\
+Low-level confounds & word count, char count, mean word length, mean log frequency, position (linear \& squared) \\
+Ridge $\alpha$ grid & $\{10^0,10^1,10^2,10^3,10^4,10^5\}$, selected per voxel by efficient LOO-GCV \\
+Feature standardization & yes (fit per fold) \\
+Cross-validation & $5$-fold; held-out per-voxel Pearson $r$ / $R^2$ \\
+Noise ceiling & cross-subject; donor-subject PCA $=100$; normalize where ceiling $\ge 0.1$ \\
+Bootstrap (voxel CIs; paired test) & $1000$ resamples \\
+Random seed & $0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Results}
 \label{sec:results}
 
@@ -208,9 +250,12 @@ result: normalized predictivity rises with depth to $\sim$$1.0$ at the final lay
 ($0.11 \rightarrow 0.98$). Larger and deeper models (Pythia-410M/1B/1.4B, Qwen2.5-0.5B/1.5B)
 saturate the ceiling several layers before the end, consistent with the reported ``peak moves
 earlier with scale'' (Figure~\ref{fig:scaling}, left). Normalized values slightly exceeding $1$
-(up to $1.22$ for Qwen2.5-1.5B) reflect the conservative cross-subject ceiling; we therefore
-report raw $r$ alongside, and treat cross-model normalized comparisons cautiously
-(Section~\ref{sec:discussion}).
+(up to $1.22$ for Qwen2.5-1.5B) reflect the conservative cross-subject ceiling. We therefore
+treat cross-model normalized comparisons cautiously and base them instead on the absolute,
+unnormalized peak unique$(H)$ $R^2$ (Table~\ref{tab:sweep}). Normalization here is a mean of
+per-voxel ratios (not a ratio of means), so a conservative per-voxel ceiling lifts modest raw $r$
+to the near-ceiling normalized values reported; the released pipeline recomputes per-voxel raw
+$r$ directly. See Section~\ref{sec:discussion}.
 
 \subsection{Hidden representations survive confound control}
 \label{sec:core}
@@ -225,8 +270,12 @@ nuisance contribution ($0.0068$) at that layer. The confounds dominate \emph{onl
 embedding layer (layer $0$: unique-nuisance $\approx 0.02$, unique-hidden $\approx 0.001$) and
 collapse at the most predictive layers---exactly the pattern expected if low-level signals
 explain shallow representations while deep representations carry structure beyond them. Across
-models the peak unique-hidden:nuisance ratio is roughly $5$--$40\times$ (typically
-$7$--$15\times$).
+models the peak unique-hidden:nuisance ratio is roughly $5$--$15\times$. Two Pythia models show
+inflated ratios (Pythia-1B $43\times$, Pythia-1.4B $16\times$): this is a small-\emph{denominator}
+effect, not an unusually large numerator---unique-nuisance is almost entirely absorbed into the
+shared partition at those models' peak layers, so the quotient becomes large and unstable. We
+therefore foreground the absolute unique$(H)$, the absolute unique-nuisance, and the
+\% retained, and read the ratio only as an order-of-magnitude summary.
 
 \begin{figure}[t]
 \centering
@@ -291,10 +340,18 @@ its own peak layer) gives a strictly positive base$-$instruct difference
 $+0.0056$ ($95\%$ bootstrap CI $[+0.0053, +0.0060]$); Qwen2.5-1.5B,
 $0.0701 \rightarrow 0.0667$, $+0.0035$ ($[+0.0032, +0.0039]$). The effect is consistent in
 direction and significant at both scales, though smaller at $1.5$B, so it is not a single-pair
-idiosyncrasy. This runs opposite to \citet{aw2024}, who find instruction tuning \emph{raises}
-overall predictivity; the measures differ---total predictivity can rise as instruction tuning
-aligns output distributions (a surprisal-side effect), while the \emph{unique-beyond-surprisal}
-structural residual we isolate falls.
+idiosyncrasy. This runs opposite to \citet{aw2024}, who report that instruction tuning
+\emph{raises} overall brain alignment. We stress that we do \emph{not} observe a rise even in
+\emph{total} predictivity: on our cross-subject-normalized measure, instruction tuning lowers
+norm $r$ slightly for both pairs as well ($1.13\rightarrow1.10$ and $1.22\rightarrow1.19$;
+Table~\ref{tab:sweep}). The discrepancy is therefore one of dataset and metric scope, not a
+contradiction internal to our pipeline: \citet{aw2024} aggregate a brain-alignment score across
+several datasets under a different regression and ceiling protocol, whereas we measure
+single-dataset (Pereira2018), noise-ceiling-normalized predictivity and the
+unique-beyond-surprisal residual. Within our pipeline both total predictivity and the unique
+residual decline modestly under instruction tuning; the robust, primary effect is the decline of
+the unique structural residual, established by the paired voxel-level test above
+(non-overlapping CIs at both scales).
 
 \begin{figure}[t]
 \centering
@@ -311,7 +368,10 @@ cross-subject noise ceiling; stabilized LOO-GCV ridge). ``norm $r$'' is best-lay
 predictivity; ``unique$(H)$'' is the peak across layers with a $95\%$ voxel-bootstrap CI under
 the \emph{full confound-controlled} nuisance space; ``\% ret.'' is the fraction retained relative
 to the surprisal-only partition; $H{:}N$ is the unique-hidden:unique-nuisance ratio at the peak
-layer.}
+layer. The two largest $H{:}N$ values (Pythia-1B, -1.4B) reflect a near-floor denominator, not a
+larger numerator (Section~\ref{sec:core}). The released pipeline recomputes per-voxel raw $r$
+(Section~\ref{sec:repro}); cross-model comparison should rely on the absolute, unnormalized peak
+unique$(H)$ column rather than on norm $r$.}
 \label{tab:sweep}
 \centering
 \begin{tabular}{lrrrrr}
@@ -357,13 +417,21 @@ Our central result---that hidden representations uniquely explain far more brain
 \emph{confound-controlled} nuisance space, growing with depth and surviving the positional and
 word-rate controls of \citet{feghhi2024}---supports a structural, rather than purely predictive
 or confound-driven, account of LLM--brain alignment, while quantifying the (small but non-zero)
-unique nuisance contribution.
+unique nuisance contribution. We state plainly that ``survives confound control'' means survival
+of \emph{these} controls---the positional and word-rate signals of \citet{feghhi2024} together
+with predictive entropy, word length, and frequency---and not confound-completeness: richer
+positional, discourse, or symbolic-syntactic covariates (Limitations~iv--v) could absorb
+additional variance.
 
-\paragraph{Limitations.} (i) Our main sweep uses the $384$-sentence experiment; a full sweep on
-the independent $243$-sentence experiment is in progress. (ii) Our cross-subject ceiling is
+\paragraph{Limitations.} (i) Our main sweep uses the $384$-sentence experiment; on the
+independent $243$-sentence experiment ($6$ subjects, $8{,}031$ voxels) the core result already
+replicates---GPT-2 peak unique$(H)=0.049$ [$.048,.050$] and Qwen2.5-0.5B $0.046$ [$.044,.047$],
+both far exceeding unique-nuisance---and a full size/instruction-tuning sweep there is in
+progress. (ii) Our cross-subject ceiling is
 principled but not identical to the brain-score extrapolation ceiling; some normalized values
-exceed $1$, indicating a conservative ceiling estimate, so we report raw $r$ alongside and avoid
-over-interpreting normalized cross-model rankings. (iii) Confidence intervals are bootstrap over
+exceed $1$, indicating a conservative ceiling estimate, so we anchor cross-model comparison on
+the absolute unique$(H)$ $R^2$ and release per-voxel raw $r$, rather than over-interpreting
+normalized cross-model rankings. (iii) Confidence intervals are bootstrap over
 voxels; a stimulus-level bootstrap is stronger and planned. (iv) Our positional confound uses
 sentence position within its passage; finer positional and discourse covariates could absorb
 slightly more variance. (v) Even an entropy-augmented surprisal is a coarse ``statistics'' side;

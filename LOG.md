@@ -5,6 +5,39 @@ what was decided, what's blocked, what's next. Link runs to `TRACKER.md` IDs.
 
 ---
 
+## 2026-06-27 — Second review round: responsive edits (no new runs)
+
+Implemented the reviewer's new asks in `paper/main.tex` + `references.bib`. No experiments
+re-run; all numbers traced to existing TRACKER runs.
+
+- **W1 (closest prior art now cited).** Added `lepori2026` (Interpreting Brain Responses with
+  Sparse Features / Augmented Sparse Encoding Models, arXiv:2606.06857 — verified real, authors
+  Lepori/Kay/Tuckute) and `zhao2026` (Beyond next-word prediction…, bioRxiv 10.64898/2026.05.15.725490
+  — verified, authors Zhao & Brennan). New Related-Work paragraph states our 3-point delta
+  (Feghhi confounds in N, Pythia scaling axis, two-scale IT).
+- **W2 (Table-1-vs-prose tension on IT).** §4.5 now states plainly that norm r ALSO dips for both
+  instruct pairs (1.13→1.10, 1.22→1.19), so we do not claim total predictivity rises in our data;
+  reframed the Aw et al. discrepancy as dataset/metric scope, not a within-pipeline contradiction.
+- **W3 (43×/16× ratios).** Explained as a near-floor unique-nuisance denominator at those Pythia
+  peak layers (not a large numerator); foreground absolute unique(H)/unique(N)/% retained. Caption
+  note added.
+- **W4 (raw r).** Removed the unbacked "report raw r alongside" promise. No per-model raw-r summary
+  exists in our artifacts — the only recoverable E001b output is normalized_r 0.9774 @ L12 (≈ the
+  0.98 in Table 1); the earlier TRACKER note of mean_r 0.225 is not reproducible from saved output,
+  so I dropped the "raw r ≈0.22" anchor from §4.1. Now anchor cross-model comparison on the absolute
+  unique(H) R² column; the pipeline recomputes per-voxel raw r on re-run. *Open:* drop in a literal
+  raw-r column once per-model mean raw r is pulled from a fresh Colab run.
+- **W5.** Plain statement in Discussion that "survives confound control" = THESE controls, not
+  confound-completeness.
+- **Misc.** Fixed `superhuman2025` author (Anonymous → Oh & Linzen). Added a Methods hyperparameter
+  table (`tab:hyper`: α-grid, LOO-GCV, 5-fold, ceiling PCA=100, min-ceiling 0.1, 1000-resample
+  bootstrap, seed 0). Reinstated 243-set numbers in Limitation (i) from E006.
+
+Static checks pass (all \cite keys resolve, labels/refs/envs balanced); no local TeX toolchain,
+so compile on Overleaf.
+
+---
+
 ## 2026-06-19 — Clean re-run with stabilized ridge + CIs; paper finalized to current data
 
 Re-ran the full sweep (E003b, E004) and the 243-set robustness (E006) in Colab with the
