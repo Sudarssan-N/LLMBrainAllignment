@@ -116,6 +116,45 @@ def test_build_valid_mask_drops_specials():
     assert mask2.tolist() == [True, True, True, False]
 
 
+def test_confounds_shape_and_values():
+    from llmbrain.models.confounds import compute_confounds
+
+    sents = ["the cat sat.", "a much longer sentence with many more words here."]
+    r = compute_confounds(sents, include_frequency=False)
+    assert r.names[:3] == ["n_words", "n_chars", "mean_word_len"]
+    assert r.features.shape == (2, 3)
+    # second sentence has more words and characters than the first
+    assert r.features[1, 0] > r.features[0, 0]
+    assert r.features[1, 1] > r.features[0, 1]
+    # positions add two more (z-scored linear + squared) columns, all finite
+    pos = np.array([0, 1])
+    rp = compute_confounds(sents, positions=pos, include_frequency=False)
+    assert rp.names[-2:] == ["position", "position_sq"]
+    assert rp.features.shape == (2, 5)
+    assert np.isfinite(rp.features).all()
+
+
+def test_varpart_nuisance_control_decomposition():
+    """Nuisance-controlled VP keeps the commonality identity and is backward-compatible."""
+    ds = make_synthetic_dataset(seed=5)
+    hidden, surprisal = _hidden_and_surprisal(ds)
+    confounds = np.asarray(ds.meta["latent_surprisal"])  # a nuisance-correlated block
+
+    base = variance_partitioning(hidden, surprisal, ds.responses, ALPHAS, n_folds=4, seed=0)
+    ctrl = variance_partitioning(hidden, surprisal, ds.responses, ALPHAS, n_folds=4, seed=0,
+                                 extra_nuisance=confounds)
+    # commonality identity holds per voxel: unique(H) + unique(S) + shared == joint
+    recon = ctrl.unique_hidden + ctrl.unique_surprisal + ctrl.shared
+    assert np.allclose(recon, ctrl.r2_joint, atol=1e-8, equal_nan=True)
+    # extra_nuisance=None must reproduce the original two-way decomposition exactly
+    assert np.allclose(base.r2_surprisal,
+                       variance_partitioning(hidden, surprisal, ds.responses, ALPHAS,
+                                             n_folds=4, seed=0, extra_nuisance=None).r2_surprisal,
+                       equal_nan=True)
+    # folding in a confound block actually changes the controlled (nuisance) fit
+    assert not np.allclose(base.r2_surprisal, ctrl.r2_surprisal, equal_nan=True)
+
+
 def test_matched_subset_balances_surprisal():
     rng = np.random.default_rng(0)
     surprisal = rng.normal(size=200)

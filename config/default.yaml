@@ -25,6 +25,13 @@ models:
     family: gpt2
     type: base
     layers: null
+  # Pythia suite: identical training data and step order across sizes, so 70m->1.4b is a
+  # CLEAN within-family scaling axis (the only confound-free way to vary scale here).
+  pythia-70m:
+    hf_id: EleutherAI/pythia-70m
+    family: pythia
+    type: base
+    layers: null
   pythia-160m:
     hf_id: EleutherAI/pythia-160m
     family: pythia
@@ -35,12 +42,23 @@ models:
     family: pythia
     type: base
     layers: null
+  pythia-1b:
+    hf_id: EleutherAI/pythia-1b
+    family: pythia
+    type: base
+    layers: null
+  pythia-1.4b:
+    hf_id: EleutherAI/pythia-1.4b
+    family: pythia
+    type: base
+    layers: null
   opt-125m:
     hf_id: facebook/opt-125m
     family: opt
     type: base
     layers: null
-  # Base vs instruction-tuned pair (open, ungated) for the instruction-tuning axis.
+  # Base vs instruction-tuned pairs (open, ungated) for the instruction-tuning axis.
+  # Two scales (0.5B, 1.5B) within one family test whether the IT effect is scale-dependent.
   qwen2.5-0.5b:
     hf_id: Qwen/Qwen2.5-0.5B
     family: qwen2.5
@@ -48,6 +66,16 @@ models:
     layers: null
   qwen2.5-0.5b-instruct:
     hf_id: Qwen/Qwen2.5-0.5B-Instruct
+    family: qwen2.5
+    type: instruct
+    layers: null
+  qwen2.5-1.5b:
+    hf_id: Qwen/Qwen2.5-1.5B
+    family: qwen2.5
+    type: base
+    layers: null
+  qwen2.5-1.5b-instruct:
+    hf_id: Qwen/Qwen2.5-1.5B-Instruct
     family: qwen2.5
     type: instruct
     layers: null
@@ -68,6 +96,22 @@ pooling:
 surprisal:
   reducer: [mean, sum, last]    # per-sentence summaries to use as surprisal features
   base: 2                       # log base for surprisal (bits if 2)
+  # Add per-sentence predictive-entropy summaries (mean/last of -sum p log p over the
+  # vocab) to enrich the nuisance space beyond a 3-D surprisal vector. Addresses the
+  # dimensionality-asymmetry critique: a richer statistical predictor is a fairer baseline
+  # for the high-dimensional hidden states. [] disables (reproduces the 3-D surprisal-only).
+  entropy_reducer: [mean, last]
+
+# ---------------------------------------------------------------------------
+# Low-level confounds folded into the controlled (nuisance) space for variance
+# partitioning. Per Hadidi et al. (2026), positional signals and word rate are competitive
+# with trained LLMs on Pereira2018, so surprisal alone is an insufficient control. With
+# `enabled: true`, unique-hidden is reported as variance beyond surprisal AND these.
+# ---------------------------------------------------------------------------
+confounds:
+  enabled: true
+  include_frequency: true       # mean log word-frequency (needs `wordfreq`; skipped if absent)
+  include_position: true        # sentence position within its passage (from assembly metadata)
 
 # ---------------------------------------------------------------------------
 # Encoding model (ridge regression voxel-wise).

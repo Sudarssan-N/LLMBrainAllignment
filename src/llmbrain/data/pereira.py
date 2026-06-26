@@ -185,6 +185,48 @@ def _filter_dim(a, dim, name, wanted):
     return a.isel({dim: idx})
 
 
+def _extract_position(a, pres_dim, pres_levels):
+    """Sentence position within its passage, for the positional-confound control.
+
+    Pereira stimuli are grouped into passages of consecutive sentences; position-within-
+    passage is the confound Hadidi et al. (2026) show is competitive with trained LLMs.
+    Strategy, in order of preference:
+      1. an explicit numeric sentence-number level (e.g. 'sentence_num');
+      2. else rank within each passage group (a 'passage*' level), by assembly order;
+      3. else a global running index (a coarse positional/drift proxy).
+    Returns a float (n_presentation,) array, or None if even arange is impossible.
+    """
+    import numpy as np
+
+    n = a.shape[0]
+    # 1: explicit sentence-number level
+    for lvl in pres_levels:
+        low = lvl.lower()
+        if ("sentence" in low and ("num" in low or "id" in low or "idx" in low)) \
+                or "position" in low or "within" in low:
+            try:
+                vals = _level_values(a, pres_dim, lvl)
+                if vals.dtype.kind in ("i", "u", "f"):
+                    return np.asarray(vals, dtype=np.float64)
+            except Exception:  # noqa: BLE001
+                continue
+    # 2: rank within passage group
+    passage_lvl = next((l for l in pres_levels if "passage" in l.lower()), None)
+    if passage_lvl:
+        try:
+            groups = _level_values(a, pres_dim, passage_lvl)
+            pos = np.zeros(n, dtype=np.float64)
+            seen: dict = {}
+            for i, g in enumerate(groups):
+                seen[g] = seen.get(g, -1) + 1
+                pos[i] = seen[g]
+            return pos
+        except Exception:  # noqa: BLE001
+            pass
+    # 3: global running index
+    return np.arange(n, dtype=np.float64)
+
+
 def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
     """Convert an xarray NeuroidAssembly (presentation × neuroid) to BrainDataset.
 
@@ -229,6 +271,9 @@ def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
         print(f"[pereira] WARNING: no sentence-text level found among {pres_levels}; "
               "using placeholders (activations would be meaningless!).")
 
+    # sentence position within passage (positional confound); subset with rows below
+    position = _extract_position(a, pres_dim, pres_levels)
+
     responses = np.asarray(a.values, dtype=np.float32)  # (presentation, neuroid)
 
     # --- drop NaN voxels (columns), then any residual NaN rows ---
@@ -243,6 +288,8 @@ def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
         print(f"[pereira] dropping {int((~row_ok).sum())} presentation rows with residual NaN")
         responses = responses[row_ok]
         sentences = [s for s, keep in zip(sentences, row_ok) if keep]
+        if position is not None:
+            position = position[row_ok]
 
     if responses.shape[1] == 0:
         raise ValueError(
@@ -271,6 +318,7 @@ def _assembly_to_dataset(assembly, experiments, atlas) -> BrainDataset:
         roi=roi,
         subject_ids=subjects,
         voxel_subject=voxel_subject,
+        position=position,
         name="pereira2018",
         is_synthetic=False,
         meta={"atlas": atlas, "experiments": experiments,

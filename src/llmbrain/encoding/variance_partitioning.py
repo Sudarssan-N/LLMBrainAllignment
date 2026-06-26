@@ -71,12 +71,26 @@ def variance_partitioning(
     standardize: bool = True,
     pca_components: int | None = None,
     seed: int = 0,
+    extra_nuisance: np.ndarray | None = None,
 ) -> VariancePartition:
-    """Decompose voxel variance into unique/shared contributions of hidden vs surprisal."""
-    joint = np.concatenate([np.asarray(hidden), np.asarray(surprisal)], axis=1)
+    """Decompose voxel variance into unique/shared contributions of hidden vs a nuisance space.
+
+    The nuisance space is `surprisal` by default. Pass `extra_nuisance` (e.g. word-rate,
+    sentence length, word-frequency and positional confounds from
+    `llmbrain.models.confounds`) to *fold low-level confounds into the controlled space*.
+    `unique_hidden` is then the variance hidden states explain **beyond surprisal AND those
+    confounds** — the estimate that survives the Hadidi et al. (2026) positional/word-rate
+    critique. With `extra_nuisance=None` the behaviour is identical to before.
+    """
+    surprisal = np.asarray(surprisal)
+    if extra_nuisance is not None:
+        nuisance = np.concatenate([surprisal, np.asarray(extra_nuisance)], axis=1)
+    else:
+        nuisance = surprisal
+    joint = np.concatenate([np.asarray(hidden), nuisance], axis=1)
 
     r2_h = ridge_encode(hidden, Y, alphas, n_folds, standardize, pca_components, seed).voxel_r2
-    r2_s = ridge_encode(surprisal, Y, alphas, n_folds, standardize, None, seed).voxel_r2
+    r2_s = ridge_encode(nuisance, Y, alphas, n_folds, standardize, None, seed).voxel_r2
     r2_j = ridge_encode(joint, Y, alphas, n_folds, standardize, pca_components, seed).voxel_r2
 
     return VariancePartition(

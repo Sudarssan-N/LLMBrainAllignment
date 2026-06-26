@@ -23,7 +23,10 @@ from .activations import load_model_and_tokenizer, _select_device
 class SurprisalResult:
     hf_id: str
     reducers: list[str]
-    # features: (n_sentences, n_reducers) in the order of `reducers`
+    # feature_names: column labels for `features`, e.g.
+    # ["surprisal_mean", "surprisal_sum", "surprisal_last", "entropy_mean", "entropy_last"]
+    feature_names: list[str]
+    # features: (n_sentences, n_features) — surprisal reducers then entropy reducers
     features: np.ndarray
     per_sentence: list[np.ndarray]  # ragged per-token surprisal
 
@@ -50,14 +53,22 @@ def compute_surprisal(
     base: float = 2.0,
     cache_dir: str | None = None,
     max_length: int = 512,
+    entropy_reducers: list[str] | None = None,
 ) -> SurprisalResult:
-    """Compute per-sentence surprisal features.
+    """Compute per-sentence surprisal (and optional predictive-entropy) features.
 
     base=2 gives surprisal in bits; base=e (math.e) gives nats.
+
+    `entropy_reducers` (e.g. ["mean", "last"]) appends per-sentence summaries of the
+    next-token predictive entropy H_t = -sum_v p(v) log p(v) at each position. Entropy is a
+    distribution-level uncertainty signal distinct from the realized surprisal of the
+    observed token, and enriches the controlled nuisance space toward a fairer
+    dimensionality match with the hidden states. Pass None/[] to disable.
     """
     import torch
 
     reducers = reducers or ["mean", "sum", "last"]
+    entropy_reducers = entropy_reducers or []
     model, tok = load_model_and_tokenizer(hf_id, device, cache_dir)
     dev = _select_device(device)
     log_base = float(np.log(base))
@@ -77,11 +88,22 @@ def compute_surprisal(
         chosen = log_probs[:-1].gather(1, tgt.unsqueeze(1)).squeeze(1)  # (T-1,)
         surprisal = (-chosen.cpu().numpy()) / log_base  # convert nats -> chosen base
         per_sentence.append(surprisal.astype(np.float32))
-        feats.append([_reduce(surprisal, r) for r in reducers])
+        row = [_reduce(surprisal, r) for r in reducers]
+        if entropy_reducers:
+            # H_t over the predictive distribution at each context position (same alignment
+            # as surprisal: positions 0..T-2 predict tokens 1..T-1).
+            ent = (-(log_probs[:-1].exp() * log_probs[:-1]).sum(dim=-1)).cpu().numpy()
+            ent = ent / log_base
+            row += [_reduce(ent, r) for r in entropy_reducers]
+        feats.append(row)
+
+    feature_names = [f"surprisal_{r}" for r in reducers] + \
+        [f"entropy_{r}" for r in entropy_reducers]
 
     return SurprisalResult(
         hf_id=hf_id,
         reducers=reducers,
+        feature_names=feature_names,
         features=np.asarray(feats, dtype=np.float32),
         per_sentence=per_sentence,
     )

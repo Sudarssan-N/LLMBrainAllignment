@@ -54,6 +54,7 @@ def make_synthetic_dataset(
     responses = np.mean(responses_by_subject, axis=0).astype(np.float32)
 
     roi = rng.integers(0, 3, size=n_voxels)  # 3 fake ROIs
+    position = (np.arange(n_samples) % 4).astype(np.float64)  # fake passages of 4 sentences
 
     return BrainDataset(
         sentences=sentences,
@@ -61,6 +62,7 @@ def make_synthetic_dataset(
         responses_by_subject=responses_by_subject,
         roi=roi,
         subject_ids=[f"S{i:02d}" for i in range(n_subjects)],
+        position=position,
         name="synthetic",
         is_synthetic=True,
         meta={"latent_semantic": semantic, "latent_surprisal": surprisal_latent},
@@ -90,10 +92,17 @@ def synthetic_activations(
 
 
 def synthetic_surprisal_features(
-    ds: BrainDataset, reducers: list[str], seed: int = 0
+    ds: BrainDataset, reducers: list[str], seed: int = 0,
+    entropy_reducers: list[str] | None = None,
 ) -> np.ndarray:
-    """Fake per-sentence surprisal features from the dataset's latent surprisal factor."""
+    """Fake per-sentence surprisal (+ entropy) features from the latent surprisal factor.
+
+    Entropy columns are generated as a noisier correlate of the same latent so the
+    synthetic pipeline exercises the wider nuisance space without claiming realism.
+    """
     rng = np.random.default_rng(seed + 200)
     base = ds.meta["latent_surprisal"]  # (n_samples, 1)
+    n_extra = len(entropy_reducers or [])
     cols = [base[:, 0] + rng.normal(scale=0.1, size=base.shape[0]) for _ in reducers]
+    cols += [base[:, 0] + rng.normal(scale=0.4, size=base.shape[0]) for _ in range(n_extra)]
     return np.stack(cols, axis=1).astype(np.float32)

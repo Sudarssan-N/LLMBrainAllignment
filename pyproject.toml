@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 models = ["torch>=2.1", "transformers>=4.40", "accelerate>=0.28"]
 plot = ["matplotlib>=3.7", "seaborn>=0.12"]
+confounds = ["wordfreq>=3.0"]  # word-frequency confound feature (graceful no-op if absent)
 dev = ["pytest>=7.4"]
 
 [tool.setuptools.packages.find]
