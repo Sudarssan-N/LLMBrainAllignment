@@ -52,7 +52,7 @@ encoding combined with variance partitioning (commonality analysis). Crucially, 
 space is not surprisal alone: it bundles surprisal, predictive entropy, word rate, word
 length, word frequency, and \emph{sentence position}---the positional and word-rate signals
 that recent work shows are competitive with trained LLMs on this dataset
-\citep{hadidi2026}. Across eleven models spanning $70$M--$1.5$B parameters and four families,
+\citep{feghhi2024}. Across eleven models spanning $70$M--$1.5$B parameters and four families,
 the unique-hidden contribution \emph{survives} this strict control: adding the low-level
 confounds to surprisal removes only $4$--$9\%$ of peak unique-hidden, which still exceeds the
 unique contribution of the entire nuisance space by roughly an order of magnitude
@@ -81,7 +81,7 @@ sensitivity to next-word \emph{predictability} (surprisal). \citet{kauf2023} arg
 lexical-semantic content, rather than syntactic form, drives ANN--brain similarity; other work
 shows that highly capable models can become \emph{less} human-like on prediction-based
 behavioural measures \citep{superhuman2025}. A sharper challenge comes from
-\citet{hadidi2026}, who show that simple stimulus confounds---chiefly \emph{positional signals}
+\citet{feghhi2024}, who show that simple stimulus confounds---chiefly \emph{positional signals}
 and \emph{word rate}---are competitive with trained LLMs on Pereira2018 and fully account for
 the predictivity of \emph{untrained} models, warning that the dataset's linguistic features are
 highly collinear with these simpler explanations. Surprisal, and structural complexity, are
@@ -94,7 +94,7 @@ surprisal explains alignment, we ask: \textbf{how much of LLM--brain alignment o
 confounds, and how does that residual depend on model size, layer depth, and instruction
 tuning?} We answer it with variance partitioning over a voxel-wise encoding model, where the
 \emph{controlled} feature space bundles surprisal together with the positional and word-rate
-confounds of \citet{hadidi2026}. This cleanly separates the variance unique to hidden states
+confounds of \citet{feghhi2024}. This cleanly separates the variance unique to hidden states
 from variance attributable to surprisal or those confounds---robust to their collinearity.
 
 \paragraph{Contributions.}
@@ -124,11 +124,11 @@ next-word prediction and argued some alignment depends on information beyond it.
 \paragraph{What drives alignment, and confounds.} \citet{kauf2023} perturb word order and
 content/function words on Pereira2018, concluding lexical-semantic content dominates; their
 analysis does not statistically control for surprisal in the hidden-state-to-brain mapping.
-\citet{hadidi2026} provide the strongest cautionary result: positional signals and word rate
+\citet{feghhi2024} provide the strongest cautionary result: positional signals and word rate
 account for much of Pereira2018 predictivity, and untrained-model predictivity collapses once
 they are controlled. We take this seriously by folding exactly these signals into our nuisance
 space, so that our reported unique-hidden variance is what remains \emph{after} the confounds
-that \citet{hadidi2026} identify. Variance partitioning / commonality analysis itself is a
+that \citet{feghhi2024} identify. Variance partitioning / commonality analysis itself is a
 standard tool for separating feature spaces in encoding models \citep{deheer2017}.
 
 \paragraph{Instruction tuning.} Our instruction-tuning finding runs against
@@ -171,7 +171,7 @@ model, summarized per sentence by mean, sum, and final-token value. (ii) \emph{P
 entropy}: per-position $H_t=-\sum_v p(v)\log_2 p(v)$ over the next-token distribution,
 summarized by mean and final value---a distribution-level uncertainty signal distinct from the
 realized surprisal, which also widens the predictor toward a fairer dimensionality match with
-hidden states. (iii) \emph{Low-level confounds} \citep{hadidi2026}: word count, character
+hidden states. (iii) \emph{Low-level confounds} \citep{feghhi2024}: word count, character
 count, mean word length, mean log word frequency, and \emph{sentence position within its
 passage} (linear and squared). Concatenated, these form the nuisance space $N$.
 
@@ -217,7 +217,7 @@ report raw $r$ alongside, and treat cross-model normalized comparisons cautiousl
 Variance partitioning shows that hidden representations uniquely explain far more brain variance
 than the entire nuisance space at every layer, and the advantage grows with depth. Critically,
 this holds under the strict, confound-controlled nuisance space. Folding the positional and
-word-rate confounds of \citet{hadidi2026} (plus entropy, length, frequency) on top of surprisal
+word-rate confounds of \citet{feghhi2024} (plus entropy, length, frequency) on top of surprisal
 removes only $4$--$9\%$ (mean $\sim$$7\%$) of peak unique-hidden across all eleven models
 (Figure~\ref{fig:survival}; Table~\ref{tab:sweep}). For GPT-2, peak $\text{unique}(H)$ falls
 from $0.0513$ (surprisal only) to $0.0480$ (full control), still $\sim$$7\times$ the unique
@@ -230,11 +230,11 @@ $7$--$15\times$).
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.65\linewidth]{figures/fig_confound_survival.png}
+\includegraphics[width=0.65\linewidth]{figures/fig_confound_survival}
 \caption{Unique-hidden survival under confound control (GPT-2). Solid blue: unique-hidden when
 controlling for the full nuisance space (surprisal, entropy, word rate/length/frequency,
 position). Dashed red: controlling for surprisal only. The two curves nearly coincide at every
-layer---the positional and word-rate confounds of \citet{hadidi2026} absorb only a small slice
+layer---the positional and word-rate confounds of \citet{feghhi2024} absorb only a small slice
 of unique-hidden---so the result is not explained by low-level stimulus signals.}
 \label{fig:survival}
 \end{figure}
@@ -251,7 +251,7 @@ joint-voxel pooling.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.55\linewidth]{figures/fig_per_subject.png}
+\includegraphics[width=0.55\linewidth]{figures/fig_per_subject}
 \caption{Per-subject vs.\ pooled peak unique-hidden (GPT-2). Points are individual subjects; the
 blue line is the across-subject mean (equal weight) and the dashed red line the pooled estimate.
 They coincide, ruling out a voxel-pooling artifact.}
@@ -273,7 +273,7 @@ points for context only, not as a trend.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/fig_scaling.png}
+\includegraphics[width=\linewidth]{figures/fig_scaling}
 \caption{\textbf{Left:} noise-ceiling-normalized predictivity vs.\ relative layer depth for all
 eleven models; the dashed line marks the cross-subject ceiling. \textbf{Right:} peak
 unique-hidden $R^2$ vs.\ parameter count. The Pythia suite (blue line) is the only confound-free
@@ -298,7 +298,7 @@ structural residual we isolate falls.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.8\linewidth]{figures/fig_instruct_pairs.png}
+\includegraphics[width=0.8\linewidth]{figures/fig_instruct_pairs}
 \caption{Peak unique-hidden $R^2$ (with $95\%$ CIs) for two base/instruct pairs. Instruction
 tuning significantly reduces unique structure at both $0.5$B and $1.5$B, ruling out a
 single-pair artifact.}
@@ -344,7 +344,7 @@ findings are not an artifact of the encoding mapping alone.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.65\linewidth]{figures/fig_geometry_all.png}
+\includegraphics[width=0.65\linewidth]{figures/fig_geometry_all}
 \caption{RSA (Spearman $\rho$ between model-layer and brain RDMs) vs.\ relative depth for all
 eleven models. Scores are small but positive for the more predictive models, corroborating the
 encoding-model results with a mapping-free measure.}
@@ -355,7 +355,7 @@ encoding-model results with a mapping-free measure.}
 \label{sec:discussion}
 Our central result---that hidden representations uniquely explain far more brain variance than a
 \emph{confound-controlled} nuisance space, growing with depth and surviving the positional and
-word-rate controls of \citet{hadidi2026}---supports a structural, rather than purely predictive
+word-rate controls of \citet{feghhi2024}---supports a structural, rather than purely predictive
 or confound-driven, account of LLM--brain alignment, while quantifying the (small but non-zero)
 unique nuisance contribution.
 
